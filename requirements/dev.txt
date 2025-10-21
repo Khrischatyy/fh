@@ -1,0 +1,30 @@
+# Include base requirements
+-r base.txt
+
+# Development Tools
+black==24.1.1
+ruff==0.1.14
+mypy==1.8.0
+pre-commit==3.6.0
+
+# Testing
+pytest==8.0.0
+pytest-asyncio==0.23.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+httpx==0.26.0
+faker==22.6.0
+
+# Database Testing
+pytest-alembic==0.11.0
+
+# Documentation
+mkdocs==1.5.3
+mkdocs-material==9.5.6
+
+# Debugging
+ipython==8.20.0
+ipdb==0.13.13
+
+# Code Quality
+coverage==7.4.0

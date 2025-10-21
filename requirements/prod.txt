@@ -1,0 +1,11 @@
+# Include base requirements
+-r base.txt
+
+# Production Server
+gunicorn==21.2.0
+
+# Production Monitoring
+sentry-sdk[fastapi]==1.39.2
+
+# Performance
+orjson==3.9.12
