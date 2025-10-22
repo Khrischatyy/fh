@@ -43,6 +43,7 @@ help:
 	@echo ""
 	@echo "$(YELLOW)Utilities:$(NC)"
 	@echo "  make shell            - Open Python shell in container"
+	@echo "  make routes           - List all API routes (like 'php artisan route:list')"
 	@echo "  make clean            - Stop and remove all containers and volumes"
 	@echo "  make stop             - Stop all containers"
 	@echo "  make ps               - Show running containers"
@@ -225,6 +226,10 @@ shell:
 shell-bash:
 	@echo "$(GREEN)Opening bash shell in API container...$(NC)"
 	docker-compose -f dev.yml exec api /bin/sh
+
+routes:
+	@echo "$(GREEN)Listing all API routes...$(NC)"
+	@docker-compose -f dev.yml exec api python scripts/list_routes.py
 
 clean:
 	@echo "$(YELLOW)Stopping and removing all containers, networks, and volumes...$(NC)"

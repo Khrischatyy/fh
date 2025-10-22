@@ -13,7 +13,7 @@ from src.auth.models import User
 from src.auth.service import auth_service
 from src.auth.dependencies import get_current_user
 from src.config import settings
-from src.exceptions import UnauthorizedException, BadRequestException
+from src.exceptions import UnauthorizedException, BadRequestException, NotFoundException
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -105,23 +105,24 @@ async def get_current_user_info(
     return current_user
 
 
-@router.post("/verify-email")
-async def verify_email(
-    verification_data: schemas.EmailVerificationRequest,
+@router.get("/email/verify/{id}/{hash}")
+async def verify_email_with_hash(
+    id: int,
+    hash: str,
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Verify user email with verification token.
+    Verify user email using Laravel-style id/hash verification.
 
-    - **token**: Email verification token sent to user's email
+    - **id**: User ID
+    - **hash**: SHA1 hash of user's email
     """
-    # TODO: Implement email verification logic
-    # - Decode/validate token
-    # - Get user from token
-    # - Mark email as verified
-    # - Return success response
+    success = await auth_service.verify_email_by_hash(db, id, hash)
 
-    return {"message": "Email verified successfully"}
+    if not success:
+        raise NotFoundException("Invalid verification link")
+
+    return {"message": "Email successfully verified."}
 
 
 @router.post("/forgot-password")
@@ -130,43 +131,64 @@ async def forgot_password(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Request password reset link.
+    Request password reset link (Laravel compatible).
 
     - **email**: User's email address
     """
     user = await auth_service.get_user_by_email(db, reset_request.email)
     if user:
-        # Generate reset token
-        reset_token = auth_service.generate_verification_token()
+        # Generate and store reset token
+        reset_token = await auth_service.create_password_reset_token(db, user.email)
 
-        # TODO: Store reset token with expiration
-        # TODO: Send password reset email
-        # await send_password_reset_email(user.email, reset_token)
+        # TODO: Send password reset email with token
+        # reset_url = f"{settings.frontend_url}/reset-password?token={reset_token}&email={user.email}"
+        # await send_password_reset_email(user.email, reset_url)
 
-    # Always return success to prevent email enumeration
-    return {"message": "If the email exists, a password reset link has been sent"}
+    # Always return success to prevent email enumeration (Laravel behavior)
+    return {"message": "We have emailed your password reset link!"}
 
 
 @router.post("/reset-password")
 async def reset_password(
     reset_data: schemas.PasswordReset,
+    email: str = Query(..., description="User's email address"),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Reset password with reset token.
+    Reset password with reset token (Laravel compatible).
 
+    - **email**: User's email address (query parameter)
     - **token**: Password reset token from email
     - **password**: New password
     - **password_confirmation**: Password confirmation
     """
-    # TODO: Implement password reset logic
-    # - Validate reset token
-    # - Get user from token
-    # - Change password
-    # - Invalidate reset token
-    # - Return success response
+    # Verify reset token
+    reset_token = await auth_service.verify_password_reset_token(db, email, reset_data.token)
+    if not reset_token:
+        raise BadRequestException("This password reset token is invalid.")
 
-    return {"message": "Password reset successfully"}
+    # Get user
+    user = await auth_service.get_user_by_email(db, email)
+    if not user:
+        raise NotFoundException("User not found")
+
+    # Change password
+    await auth_service.change_password(db, user, reset_data.password)
+
+    # Delete reset token
+    await auth_service.delete_password_reset_token(db, email)
+
+    # Create access token for auto-login (Laravel behavior)
+    access_token = auth_service.create_access_token(
+        data={"sub": user.id},
+        expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
+    )
+
+    return {
+        "message": "Password reset successfully",
+        "token": access_token,
+        "role": user.role,
+    }
 
 
 @router.get("/google/redirect")
@@ -263,17 +285,110 @@ async def resend_verification(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Resend email verification link.
+    Resend email verification link (Laravel Fortify compatible).
     Requires authentication.
     """
-    if current_user.is_verified:
+    if current_user.email_verified_at:
         raise BadRequestException("Email is already verified")
 
-    # Generate new verification token
-    verification_token = auth_service.generate_verification_token()
+    # Generate verification URL
+    # verification_url = f"{settings.frontend_url}/email/verify/{current_user.id}/{hashlib.sha1(current_user.email.encode()).hexdigest()}"
 
-    # TODO: Store verification token
     # TODO: Send verification email
-    # await send_verification_email(current_user.email, verification_token)
+    # await send_verification_email(current_user.email, verification_url)
 
-    return {"message": "Verification email sent"}
+    return {"message": "A fresh verification link has been sent to your email address."}
+
+
+@router.post("/logout")
+async def logout(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Logout user (token invalidation).
+
+    Note: With JWT tokens, true logout requires a token blacklist on the backend
+    or relying on token expiration. For now, we return success and the frontend
+    should delete the token.
+    """
+    # TODO: Implement token blacklist if needed
+    # For JWT-based auth, the frontend typically just deletes the token
+    return {"message": "Successfully logged out"}
+
+
+@router.post("/confirm-password", status_code=status.HTTP_201_CREATED)
+async def confirm_password(
+    request: schemas.ConfirmPasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Confirm user's password (Laravel Fortify compatible).
+
+    Used before sensitive operations to re-verify the user's identity.
+    """
+    is_valid = await auth_service.confirm_password(db, current_user, request.password)
+
+    if not is_valid:
+        raise BadRequestException("The provided password is incorrect.")
+
+    return {"confirmed": True}
+
+
+@router.get("/confirmed-password-status")
+async def confirmed_password_status(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get password confirmation status (Laravel Fortify compatible).
+
+    Returns whether the user has recently confirmed their password.
+    For simplicity, we always return confirmed=true since we don't track confirmation timestamps.
+    """
+    # TODO: Track password confirmation timestamp in session/cache
+    # For now, return true since we verify password on sensitive operations
+    return {"confirmed": True}
+
+
+@router.put("/password")
+async def update_password(
+    password_data: schemas.PasswordUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Update user password (Laravel Fortify compatible).
+
+    Requires current password for verification.
+    """
+    await auth_service.update_password(
+        db,
+        current_user,
+        password_data.current_password,
+        password_data.password
+    )
+
+    return {"message": "Password updated successfully"}
+
+
+@router.put("/profile-information")
+async def update_profile_information(
+    profile_data: schemas.ProfileInformationUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Update user profile information (Laravel Fortify compatible).
+
+    Can update name, email, and other profile fields.
+    """
+    updated_user = await auth_service.update_profile_information(
+        db,
+        current_user,
+        profile_data
+    )
+
+    return {
+        "message": "Profile information updated successfully",
+        "user": schemas.UserResponse.model_validate(updated_user)
+    }

@@ -52,8 +52,9 @@ class RegisterResponse(BaseModel):
 
 
 class UserResponse(BaseModel):
-    """Schema for user response."""
+    """Schema for user response (Laravel compatible)."""
     id: int
+    name: Optional[str] = None
     email: str
     firstname: str
     lastname: str
@@ -61,15 +62,11 @@ class UserResponse(BaseModel):
     phone: Optional[str] = None
     date_of_birth: Optional[datetime] = None
     profile_photo: Optional[str] = None
-    bio: Optional[str] = None
-    avatar: Optional[str] = None
     role: str
-    is_active: bool
-    is_verified: bool
     email_verified_at: Optional[datetime] = None
     payment_gateway: Optional[str] = None
     stripe_account_id: Optional[str] = None
-    stripe_onboarding_complete: bool
+    google_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -120,3 +117,33 @@ class GoogleAuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+class PasswordUpdate(BaseModel):
+    """Schema for updating password when authenticated (Fortify compatible)."""
+    current_password: str = Field(..., description="Current password")
+    password: str = Field(..., min_length=8, max_length=100, description="New password")
+    password_confirmation: str = Field(..., min_length=8, max_length=100, description="Password confirmation")
+
+    @field_validator("password_confirmation")
+    @classmethod
+    def passwords_match(cls, v: str, info) -> str:
+        if "password" in info.data and v != info.data["password"]:
+            raise ValueError("The password confirmation does not match.")
+        return v
+
+
+class ConfirmPasswordRequest(BaseModel):
+    """Schema for password confirmation (Fortify compatible)."""
+    password: str = Field(..., description="Current password to confirm")
+
+
+class ProfileInformationUpdate(BaseModel):
+    """Schema for updating profile information (Fortify compatible)."""
+    name: Optional[str] = Field(None, min_length=1, max_length=255, description="User's full name")
+    email: Optional[EmailStr] = Field(None, max_length=255, description="User's email address")
+    firstname: Optional[str] = Field(None, min_length=1, max_length=100)
+    lastname: Optional[str] = Field(None, min_length=1, max_length=100)
+    username: Optional[str] = Field(None, max_length=100)
+    phone: Optional[str] = Field(None, max_length=50)
+    date_of_birth: Optional[datetime] = None

@@ -41,8 +41,9 @@ async def get_current_user(
     if user is None:
         raise UnauthorizedException("User not found")
 
-    if not user.is_active:
-        raise ForbiddenException("User account is inactive")
+    # Note: Laravel doesn't have is_active field, so we skip this check
+    # if not user.is_active:
+    #     raise ForbiddenException("User account is inactive")
 
     return user
 
@@ -58,7 +59,7 @@ async def get_current_verified_user(
         async def create_listing(current_user: User = Depends(get_current_verified_user)):
             ...
     """
-    if not current_user.is_verified:
+    if not current_user.email_verified_at:
         raise ForbiddenException("Email verification required")
     return current_user
 

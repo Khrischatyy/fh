@@ -49,6 +49,19 @@ engineer_addresses = Table(
 )
 
 
+class PasswordResetToken(Base):
+    """Password reset token model (Laravel-compatible)."""
+
+    __tablename__ = "password_reset_tokens"
+
+    email: Mapped[str] = mapped_column(String(255), primary_key=True)
+    token: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<PasswordResetToken(email={self.email})>"
+
+
 class User(Base, IDMixin, TimestampMixin):
     """User model for authentication and profile."""
 
