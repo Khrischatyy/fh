@@ -93,21 +93,45 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    """Handle request validation errors."""
-    errors = []
+    """Handle request validation errors - Laravel compatible format."""
+    # Build Laravel-style errors dict: {field: [messages]}
+    errors_dict = {}
+    first_error_message = None
+
     for error in exc.errors():
-        errors.append({
-            "field": ".".join(str(loc) for loc in error["loc"]),
-            "message": error["msg"],
-            "type": error["type"],
-        })
+        # Get field name (skip 'body' prefix if present)
+        field_parts = [str(loc) for loc in error["loc"] if loc != "body"]
+        field_name = field_parts[0] if field_parts else "field"
+
+        # Format error message to be user-friendly
+        error_msg = error["msg"]
+
+        # Customize messages for common validation errors
+        if error["type"] == "value_error.email":
+            error_msg = f"The {field_name} must be a valid email address."
+        elif error["type"] == "value_error.missing":
+            error_msg = f"The {field_name} field is required."
+        elif error["type"] == "string_too_short":
+            error_msg = f"The {field_name} must be at least {error.get('ctx', {}).get('limit_value', 8)} characters."
+        elif error["type"] == "string_pattern_mismatch":
+            error_msg = f"The {field_name} format is invalid."
+        elif "Passwords do not match" in error_msg or "password confirmation" in error_msg.lower():
+            error_msg = "The password confirmation does not match."
+
+        # Add to errors dict
+        if field_name not in errors_dict:
+            errors_dict[field_name] = []
+        errors_dict[field_name].append(error_msg)
+
+        # Store first error for main message
+        if first_error_message is None:
+            first_error_message = error_msg
 
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
-            "error": True,
-            "message": "Validation error",
-            "errors": errors,
+            "message": first_error_message or "Validation error",
+            "errors": errors_dict,
         },
     )
 

@@ -85,26 +85,32 @@ class AuthService:
         return result.scalar_one_or_none()
 
     async def register_user(self, db: AsyncSession, user_data: UserRegister) -> User:
-        """Register a new user."""
+        """Register a new user - Laravel compatible."""
         # Check if email already exists
         existing_user = await self.get_user_by_email(db, user_data.email)
         if existing_user:
-            raise ConflictException("Email already registered")
+            raise ConflictException("The email has already been taken.")
 
-        # Create user
+        # Hash password
         hashed_password = self.hash_password(user_data.password)
+
+        # Create user with name and role (Laravel style)
         user = User(
+            name=user_data.name,
+            firstname=user_data.name.split()[0] if user_data.name else "User",
+            lastname=" ".join(user_data.name.split()[1:]) if len(user_data.name.split()) > 1 else "",
             email=user_data.email,
-            firstname=user_data.firstname,
-            lastname=user_data.lastname,
-            username=user_data.username,
-            phone=user_data.phone,
             password_hash=hashed_password,
+            role=user_data.role,
         )
 
         db.add(user)
         await db.commit()
         await db.refresh(user)
+
+        # TODO: Generate email verification URL and dispatch email job
+        # verification_url = generate_signed_url(user.id, user.email, expires_minutes=60)
+        # await dispatch_email_verification_job(user, verification_url)
 
         return user
 

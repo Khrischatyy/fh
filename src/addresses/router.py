@@ -17,8 +17,8 @@ from src.addresses.schemas import (
     AddBadgeRequest,
 )
 from src.addresses.service import AddressService
-from src.auth.users import current_active_user
-from src.auth.models_fastapi_users import User
+from src.auth.dependencies import get_current_user
+from src.auth.models import User
 
 
 router = APIRouter(prefix="/addresses", tags=["Addresses"])
@@ -34,7 +34,7 @@ router = APIRouter(prefix="/addresses", tags=["Addresses"])
 async def create_address(
     data: AddressCreate,
     service: Annotated[AddressService, Depends(get_address_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> AddressResponse:
     """
     Create a new studio address.
@@ -104,7 +104,7 @@ async def update_address(
     address_id: int,
     data: AddressUpdate,
     service: Annotated[AddressService, Depends(get_address_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> AddressResponse:
     """Update existing studio address."""
     address = await service.update_address(address_id, data)
@@ -120,7 +120,7 @@ async def update_address(
 async def delete_address(
     address_id: int,
     service: Annotated[AddressService, Depends(get_address_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> None:
     """Delete studio address."""
     await service.delete_address(address_id)
@@ -135,7 +135,7 @@ async def delete_address(
 async def publish_address(
     address_id: int,
     service: Annotated[AddressService, Depends(get_address_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> AddressResponse:
     """Publish a studio address."""
     address = await service.publish_address(address_id)
@@ -151,7 +151,7 @@ async def publish_address(
 async def unpublish_address(
     address_id: int,
     service: Annotated[AddressService, Depends(get_address_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> AddressResponse:
     """Unpublish a studio address."""
     address = await service.unpublish_address(address_id)
@@ -200,7 +200,7 @@ async def add_equipment(
     address_id: int,
     data: AddEquipmentRequest,
     service: Annotated[AddressService, Depends(get_address_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Add equipment to an address.
@@ -220,7 +220,7 @@ async def remove_equipment(
     address_id: int,
     equipment_ids: list[int],
     service: Annotated[AddressService, Depends(get_address_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Remove equipment from an address.
@@ -259,7 +259,7 @@ async def add_badges(
     address_id: int,
     data: AddBadgeRequest,
     service: Annotated[AddressService, Depends(get_address_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Add badges/amenities to an address.

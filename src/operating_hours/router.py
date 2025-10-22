@@ -17,8 +17,8 @@ from src.operating_hours.schemas import (
     StudioClosureUpdate,
 )
 from src.operating_hours.service import OperatingHoursService
-from src.auth.users import current_active_user
-from src.auth.models_fastapi_users import User
+from src.auth.dependencies import get_current_user
+from src.auth.models import User
 
 
 router = APIRouter(prefix="/operating-hours", tags=["Operating Hours"])
@@ -37,7 +37,7 @@ async def create_operating_hour(
     address_id: int,
     data: OperatingHourCreate,
     service: Annotated[OperatingHoursService, Depends(get_operating_hours_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> OperatingHourResponse:
     """
     Create a new operating hour for an address.
@@ -62,7 +62,7 @@ async def bulk_create_operating_hours(
     address_id: int,
     data: BulkOperatingHoursCreate,
     service: Annotated[OperatingHoursService, Depends(get_operating_hours_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> list[OperatingHourResponse]:
     """
     Bulk create operating hours for an address.
@@ -116,7 +116,7 @@ async def update_operating_hour(
     hour_id: int,
     data: OperatingHourUpdate,
     service: Annotated[OperatingHoursService, Depends(get_operating_hours_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> OperatingHourResponse:
     """Update existing operating hour."""
     operating_hour = await service.update_operating_hour(hour_id, data)
@@ -132,7 +132,7 @@ async def update_operating_hour(
 async def delete_operating_hour(
     hour_id: int,
     service: Annotated[OperatingHoursService, Depends(get_operating_hours_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> None:
     """Delete operating hour."""
     await service.delete_operating_hour(hour_id)
@@ -151,7 +151,7 @@ async def create_studio_closure(
     address_id: int,
     data: StudioClosureCreate,
     service: Annotated[OperatingHoursService, Depends(get_operating_hours_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> StudioClosureResponse:
     """
     Create a new studio closure period.
@@ -225,7 +225,7 @@ async def update_studio_closure(
     closure_id: int,
     data: StudioClosureUpdate,
     service: Annotated[OperatingHoursService, Depends(get_operating_hours_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> StudioClosureResponse:
     """Update existing studio closure."""
     closure = await service.update_studio_closure(closure_id, data)
@@ -241,7 +241,7 @@ async def update_studio_closure(
 async def delete_studio_closure(
     closure_id: int,
     service: Annotated[OperatingHoursService, Depends(get_operating_hours_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> None:
     """Delete studio closure."""
     await service.delete_studio_closure(closure_id)

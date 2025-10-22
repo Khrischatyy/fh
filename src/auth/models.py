@@ -55,11 +55,15 @@ class User(Base, IDMixin, TimestampMixin):
     __tablename__ = "users"
 
     # Basic info
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     firstname: Mapped[str] = mapped_column(String(100), nullable=False)
     lastname: Mapped[str] = mapped_column(String(100), nullable=False)
     username: Mapped[Optional[str]] = mapped_column(String(100), unique=True, nullable=True, index=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    password_hash: Mapped[Optional[str]] = mapped_column("password", String(255), nullable=True)
+    password_hash: Mapped[Optional[str]] = mapped_column("hashed_password", String(255), nullable=True)
+
+    # Role (Laravel Spatie Permission compatible)
+    role: Mapped[str] = mapped_column(String(15), nullable=False, default="user", server_default="user")
 
     # Contact
     phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -91,17 +95,14 @@ class User(Base, IDMixin, TimestampMixin):
     two_factor_confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Relationships
-    # Note: Relationships to other models can be added after all models are loaded
-    # For now, we keep them commented to avoid circular import issues
-    # These can be re-enabled once all modules are fully implemented
-    # bookings: Mapped[list["Booking"]] = relationship("Booking", back_populates="user", lazy="select")
-    # sent_messages: Mapped[list["Message"]] = relationship("Message", back_populates="sender", lazy="select")
-    # received_messages: Mapped[list["Message"]] = relationship("Message", back_populates="recipient", lazy="select")
-    # payouts: Mapped[list["Payout"]] = relationship("Payout", back_populates="user", lazy="select")
-    # admin_companies: Mapped[list["AdminCompany"]] = relationship("AdminCompany", back_populates="admin", lazy="select")
-    # square_tokens: Mapped[list["SquareToken"]] = relationship("SquareToken", back_populates="user", lazy="select")
-    # favorite_addresses: Mapped[list["Address"]] = relationship("Address", secondary=favorite_studios, lazy="select")
-    # engineer_addresses: Mapped[list["Address"]] = relationship("Address", secondary=engineer_addresses, lazy="select")
+    bookings: Mapped[list["Booking"]] = relationship("Booking", back_populates="user", lazy="select")
+    sent_messages: Mapped[list["Message"]] = relationship("Message", back_populates="sender", lazy="select", foreign_keys="Message.sender_id")
+    received_messages: Mapped[list["Message"]] = relationship("Message", back_populates="recipient", lazy="select", foreign_keys="Message.recipient_id")
+    payouts: Mapped[list["Payout"]] = relationship("Payout", back_populates="user", lazy="select")
+    admin_companies: Mapped[list["AdminCompany"]] = relationship("AdminCompany", back_populates="admin", lazy="select")
+    square_tokens: Mapped[list["SquareToken"]] = relationship("SquareToken", back_populates="user", lazy="select")
+    favorite_addresses: Mapped[list["Address"]] = relationship("Address", secondary=favorite_studios, lazy="select")
+    engineer_addresses: Mapped[list["Address"]] = relationship("Address", secondary=engineer_addresses, lazy="select")
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email})>"

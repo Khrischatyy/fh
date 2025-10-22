@@ -15,16 +15,19 @@ class UserBase(BaseModel):
     phone: Optional[str] = Field(None, max_length=50)
 
 
-class UserRegister(UserBase):
-    """Schema for user registration."""
-    password: str = Field(..., min_length=8, max_length=100)
-    password_confirmation: str = Field(..., min_length=8, max_length=100)
+class UserRegister(BaseModel):
+    """Schema for user registration - Laravel compatible."""
+    name: str = Field(..., min_length=1, max_length=255, description="User's full name")
+    email: EmailStr = Field(..., max_length=255, description="User's email address")
+    password: str = Field(..., min_length=8, max_length=100, description="User's password")
+    password_confirmation: str = Field(..., min_length=8, max_length=100, description="Password confirmation")
+    role: str = Field(..., max_length=15, pattern="^(user|studio_owner|admin)$", description="User role")
 
     @field_validator("password_confirmation")
     @classmethod
     def passwords_match(cls, v: str, info) -> str:
         if "password" in info.data and v != info.data["password"]:
-            raise ValueError("Passwords do not match")
+            raise ValueError("The password confirmation does not match.")
         return v
 
 
@@ -39,6 +42,13 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
+
+
+class RegisterResponse(BaseModel):
+    """Schema for registration response - Laravel compatible."""
+    message: str
+    token: str
+    role: str
 
 
 class UserResponse(BaseModel):

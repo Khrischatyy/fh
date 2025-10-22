@@ -4,8 +4,8 @@ Company router - HTTP endpoints for company management.
 from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
-from src.auth.users import current_active_user
-from src.auth.models_fastapi_users import User
+from src.auth.dependencies import get_current_user
+from src.auth.models import User
 from src.companies.schemas import (
     CompanyCreate,
     CompanyUpdate,
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/companies", tags=["Companies"])
 async def create_company(
     data: CompanyCreate,
     service: Annotated[CompanyService, Depends(get_company_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Create a new company (brand).
@@ -39,7 +39,7 @@ async def create_company(
 @router.get("/my-companies", response_model=list[CompanyResponse], status_code=status.HTTP_200_OK)
 async def get_my_companies(
     service: Annotated[CompanyService, Depends(get_company_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Get all companies where current user is admin.
@@ -91,7 +91,7 @@ async def update_company(
     company_id: int,
     data: CompanyUpdate,
     service: Annotated[CompanyService, Depends(get_company_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Update company details.
@@ -119,7 +119,7 @@ async def update_company(
 async def delete_company(
     company_id: int,
     service: Annotated[CompanyService, Depends(get_company_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Delete a company.

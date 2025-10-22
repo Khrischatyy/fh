@@ -29,34 +29,40 @@ oauth.register(
 )
 
 
-@router.post("/register", response_model=schemas.TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=schemas.RegisterResponse, status_code=status.HTTP_200_OK)
 async def register(
     user_data: schemas.UserRegister,
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Register a new user account.
+    Register a new user account - Laravel compatible endpoint.
 
-    - **email**: User's email address (must be unique)
-    - **password**: Password (min 8 characters)
-    - **firstname**: User's first name
-    - **lastname**: User's last name
+    - **name**: User's full name (required, max 255 characters)
+    - **email**: User's email address (required, must be unique, valid email format)
+    - **password**: Password (required, min 8 characters)
+    - **password_confirmation**: Password confirmation (required, must match password)
+    - **role**: User role (required, one of: user, studio_owner, admin)
+
+    Returns:
+    - **message**: Success message
+    - **token**: Sanctum-compatible API token
+    - **role**: Assigned user role
     """
     user = await auth_service.register_user(db, user_data)
 
-    # Create access token
-    access_token = auth_service.create_access_token(
+    # Create access token (Sanctum-style format: {id}|{token})
+    access_token_jwt = auth_service.create_access_token(
         data={"sub": user.id},
         expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
     )
 
-    # TODO: Send verification email
-    # await send_verification_email(user.email, verification_token)
+    # Format token like Laravel Sanctum: "{id}|{plainTextToken}"
+    sanctum_token = f"{user.id}|{access_token_jwt}"
 
-    return schemas.TokenResponse(
-        access_token=access_token,
-        token_type="bearer",
-        expires_in=settings.access_token_expire_minutes * 60,
+    return schemas.RegisterResponse(
+        message="Registration successful, verify your email address",
+        token=sanctum_token,
+        role=user.role,
     )
 
 

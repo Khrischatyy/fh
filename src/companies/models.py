@@ -60,11 +60,10 @@ class AdminCompany(Base, IDMixin, TimestampMixin):
     )
 
     # Relationships
-    # Temporarily disabled User relationship until properly configured
-    # admin: Mapped["User"] = relationship(
-    #     "User",
-    #     back_populates="admin_companies",
-    # )
+    admin: Mapped["User"] = relationship(
+        "User",
+        back_populates="admin_companies",
+    )
     company: Mapped["Company"] = relationship(
         "Company",
         back_populates="admin_companies",

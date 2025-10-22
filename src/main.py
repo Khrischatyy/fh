@@ -22,15 +22,19 @@ from src.exceptions import (
 )
 
 # Import all models first to ensure SQLAlchemy relationships are properly configured
-# Note: Temporarily disabled complex model imports until relationships are fully configured
-# from src.auth.models_fastapi_users import User  # noqa: F401
-# from src.geographic.models import Country, City  # noqa: F401
-# from src.companies.models import Company, AdminCompany  # noqa: F401
-# from src.addresses.models import Address, OperatingHour, StudioClosure, Equipment, EquipmentType, Badge  # noqa: F401
+# Import order matters: base models first, then models with foreign keys
+from src.auth.models import User, UserRole  # noqa: F401
+from src.geographic.models import Country, City  # noqa: F401
+from src.companies.models import Company, AdminCompany  # noqa: F401
+from src.addresses.models import Address, OperatingHour, StudioClosure, Equipment, EquipmentType, Badge  # noqa: F401
+from src.rooms.models import Room  # noqa: F401
+from src.bookings.models import Booking  # noqa: F401
+from src.messages.models import Message  # noqa: F401
+from src.payments.models import Charge, Payout, SquareLocation, SquareToken  # noqa: F401
 
 # Import routers
-# from src.auth.router import router as auth_router  # Old custom auth
-from src.auth.router_fastapi_users import router as auth_router  # FastAPI Users
+from src.auth.router import router as auth_router  # Custom Laravel-compatible auth
+# from src.auth.router_fastapi_users import router as auth_router  # FastAPI Users (disabled)
 
 # Configure logging
 logging.config.fileConfig("logging.ini", disable_existing_loggers=False)

@@ -4,8 +4,8 @@ Room router - HTTP endpoints for room, price, and photo management.
 from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
-from src.auth.users import current_active_user
-from src.auth.models_fastapi_users import User
+from src.auth.dependencies import get_current_user
+from src.auth.models import User
 from src.rooms.schemas import (
     RoomCreate,
     RoomUpdate,
@@ -30,7 +30,7 @@ router = APIRouter(prefix="/rooms", tags=["Rooms"])
 async def create_room(
     data: RoomCreate,
     service: Annotated[RoomService, Depends(get_room_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Create a new room.
@@ -64,7 +64,7 @@ async def update_room(
     room_id: int,
     data: RoomUpdate,
     service: Annotated[RoomService, Depends(get_room_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Update room details.
@@ -79,7 +79,7 @@ async def update_room(
 async def delete_room(
     room_id: int,
     service: Annotated[RoomService, Depends(get_room_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Delete a room.
@@ -98,7 +98,7 @@ async def create_price(
     room_id: int,
     data: RoomPriceCreate,
     service: Annotated[RoomService, Depends(get_room_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Create a price tier for a room.
@@ -132,7 +132,7 @@ async def update_price(
     price_id: int,
     data: RoomPriceUpdate,
     service: Annotated[RoomService, Depends(get_room_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Update a price tier.
@@ -149,7 +149,7 @@ async def delete_price(
     price_id: int,
     room_id: int,
     service: Annotated[RoomService, Depends(get_room_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Delete a price tier.
@@ -174,7 +174,7 @@ async def add_photo(
     room_id: int,
     data: RoomPhotoCreate,
     service: Annotated[RoomService, Depends(get_room_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Add a photo to a room.
@@ -207,7 +207,7 @@ async def update_photo_index(
     photo_id: int,
     data: RoomPhotoUpdate,
     service: Annotated[RoomService, Depends(get_room_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Update a photo's order index.
@@ -222,7 +222,7 @@ async def update_photo_index(
 async def delete_photo(
     photo_id: int,
     service: Annotated[RoomService, Depends(get_room_service)],
-    current_user: Annotated[User, Depends(current_active_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Delete a photo.
