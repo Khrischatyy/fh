@@ -1,0 +1,90 @@
+{
+    # Global options for production
+    admin off
+    email mail@funny-how.com
+}
+
+# Production configuration with automatic HTTPS
+funny-how.com www.funny-how.com {
+    # Enable structured logging for production
+    log {
+        output stdout
+        format json
+        level INFO
+    }
+
+    # Security headers
+    header {
+        # Prevent clickjacking
+        X-Frame-Options "SAMEORIGIN"
+        # XSS protection
+        X-Content-Type-Options "nosniff"
+        X-XSS-Protection "1; mode=block"
+        # Referrer policy
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # Remove server header
+        -Server
+        # HSTS for HTTPS
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    }
+
+    # Health check endpoint
+    handle /health {
+        reverse_proxy api:8000
+    }
+
+    # FastAPI endpoints - /api, /docs, /redoc, /openapi.json
+    handle /api/* {
+        reverse_proxy api:8000 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # API documentation (consider restricting in production)
+    handle /docs {
+        reverse_proxy api:8000
+    }
+
+    handle /docs/* {
+        reverse_proxy api:8000
+    }
+
+    handle /redoc {
+        reverse_proxy api:8000
+    }
+
+    handle /openapi.json {
+        reverse_proxy api:8000
+    }
+
+    # Socket.io chat service
+    handle /socket.io/* {
+        reverse_proxy chat:6001 {
+            # WebSocket support
+            header_up Connection {>Connection}
+            header_up Upgrade {>Upgrade}
+        }
+    }
+
+    # Frontend (Nuxt) - handle all other requests
+    handle /* {
+        reverse_proxy frontend:3000 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Custom error pages
+    handle_errors {
+        respond "{err.status_code} {err.status_text}"
+    }
+}
+
+# Also handle IP-based access (HTTP only)
+http://34.121.245.229 {
+    # Redirect to HTTPS domain
+    redir https://funny-how.com{uri} permanent
+}

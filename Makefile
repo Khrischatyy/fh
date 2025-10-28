@@ -56,15 +56,15 @@ help:
 
 build:
 	@echo "$(GREEN)Building all containers...$(NC)"
-	@docker compose -f dev.yml build
+	@docker-compose -f dev.yml build
 
 dev:
 	@echo "$(GREEN)Starting all services...$(NC)"
-	@docker compose -f dev.yml up
+	@docker-compose -f dev.yml up
 
 dev-detach:
 	@echo "$(GREEN)Starting all services in background...$(NC)"
-	@docker compose -f dev.yml up -d
+	@docker-compose -f dev.yml up -d
 	@echo ""
 	@echo "$(GREEN)✅ Services started!$(NC)"
 	@echo "  - FastAPI:    $(BLUE)http://localhost$(NC) (docs: /docs)"
@@ -74,38 +74,38 @@ dev-detach:
 
 dev-build:
 	@echo "$(GREEN)Building and starting all services...$(NC)"
-	@docker compose -f dev.yml up --build
+	@docker-compose -f dev.yml up --build
 
 start: dev
 
 stop:
 	@echo "$(YELLOW)Stopping all services...$(NC)"
-	@docker compose -f dev.yml down
+	@docker-compose -f dev.yml down
 	@echo "$(GREEN)All services stopped$(NC)"
 
 restart: stop dev-detach
 
 status:
 	@echo "$(GREEN)Service Status:$(NC)"
-	@docker compose -f dev.yml ps
+	@docker-compose -f dev.yml ps
 
 logs:
-	@docker compose -f dev.yml logs -f $(container)
+	@docker-compose -f dev.yml logs -f $(container)
 
 logs-all:
-	@docker compose -f dev.yml logs -f
+	@docker-compose -f dev.yml logs -f
 
 logs-api:
-	@docker compose -f dev.yml logs -f api
+	@docker-compose -f dev.yml logs -f api
 
 logs-celery:
-	@docker compose -f dev.yml logs -f celery_worker
+	@docker-compose -f dev.yml logs -f celery_worker
 
 logs-frontend:
-	@docker compose -f dev.yml logs -f frontend
+	@docker-compose -f dev.yml logs -f frontend
 
 logs-caddy:
-	@docker compose -f dev.yml logs -f caddy
+	@docker-compose -f dev.yml logs -f caddy
 
 ps: status
 
@@ -115,7 +115,7 @@ ps: status
 
 migrate:
 	@echo "$(GREEN)Applying FastAPI migrations...$(NC)"
-	@docker compose -f dev.yml exec api alembic upgrade head
+	@docker-compose -f dev.yml exec api alembic upgrade head
 	@echo "$(GREEN)✅ Migrations applied successfully!$(NC)"
 
 migrate-create:
@@ -124,22 +124,22 @@ migrate-create:
 		exit 1; \
 	fi
 	@echo "$(GREEN)Creating new migration: $(message)$(NC)"
-	@docker compose -f dev.yml exec api alembic revision --autogenerate -m "$(message)"
+	@docker-compose -f dev.yml exec api alembic revision --autogenerate -m "$(message)"
 
 migrate-down:
 	@echo "$(YELLOW)Rolling back last migration...$(NC)"
-	@docker compose -f dev.yml exec api alembic downgrade -1
+	@docker-compose -f dev.yml exec api alembic downgrade -1
 	@echo "$(GREEN)Rollback complete$(NC)"
 
 migrate-history:
-	@docker compose -f dev.yml exec api alembic history
+	@docker-compose -f dev.yml exec api alembic history
 
 test:
 	@echo "$(GREEN)Running FastAPI tests...$(NC)"
-	@docker compose -f dev.yml exec api pytest tests/ -v --cov=src --cov-report=term-missing
+	@docker-compose -f dev.yml exec api pytest tests/ -v --cov=src --cov-report=term-missing
 
 test-verbose:
-	@docker compose -f dev.yml exec api pytest tests/ -vv
+	@docker-compose -f dev.yml exec api pytest tests/ -vv
 
 format:
 	@echo "$(GREEN)Formatting Python code...$(NC)"
@@ -153,14 +153,14 @@ lint:
 
 shell:
 	@echo "$(GREEN)Opening Python shell...$(NC)"
-	@docker compose -f dev.yml exec api python
+	@docker-compose -f dev.yml exec api python
 
 shell-bash:
-	@docker compose -f dev.yml exec api /bin/sh
+	@docker-compose -f dev.yml exec api /bin/sh
 
 routes:
 	@echo "$(GREEN)Listing all FastAPI routes...$(NC)"
-	@docker compose -f dev.yml exec api python scripts/list_routes.py
+	@docker-compose -f dev.yml exec api python scripts/list_routes.py
 
 # ==============================================================================
 # Database Commands
@@ -168,14 +168,14 @@ routes:
 
 db-shell:
 	@echo "$(GREEN)Opening PostgreSQL shell...$(NC)"
-	@docker compose -f dev.yml exec db psql -U postgres -d book_studio
+	@docker-compose -f dev.yml exec db psql -U postgres -d book_studio
 
 db-reset:
 	@echo "$(YELLOW)⚠️  WARNING: This will delete all data!$(NC)"
 	@echo -n "Are you sure? [y/N] " && read ans && [ $${ans:-N} = y ]
 	@echo "$(YELLOW)Resetting database...$(NC)"
-	@docker compose -f dev.yml exec api alembic downgrade base
-	@docker compose -f dev.yml exec api alembic upgrade head
+	@docker-compose -f dev.yml exec api alembic downgrade base
+	@docker-compose -f dev.yml exec api alembic upgrade head
 	@echo "$(GREEN)Database reset complete$(NC)"
 
 # ==============================================================================
@@ -184,15 +184,15 @@ db-reset:
 
 npm-install:
 	@echo "$(GREEN)Installing npm dependencies...$(NC)"
-	@docker compose -f dev.yml run --rm frontend sh -c "npm i"
+	@docker-compose -f dev.yml run --rm frontend sh -c "npm i"
 
 npm-install-package:
-	@docker compose -f dev.yml run --rm frontend sh -c "npm i ${p}"
+	@docker-compose -f dev.yml run --rm frontend sh -c "npm i ${p}"
 
 update-frontend:
 	@echo "$(GREEN)Restarting frontend container...$(NC)"
-	@docker compose -f dev.yml stop frontend
-	@docker compose -f dev.yml up -d frontend
+	@docker-compose -f dev.yml stop frontend
+	@docker-compose -f dev.yml up -d frontend
 
 # ==============================================================================
 # Celery Commands
@@ -200,15 +200,15 @@ update-frontend:
 
 celery-status:
 	@echo "$(GREEN)Checking Celery worker status...$(NC)"
-	@docker compose -f dev.yml exec celery_worker celery -A src.tasks.celery_app inspect active
+	@docker-compose -f dev.yml exec celery_worker celery -A src.tasks.celery_app inspect active
 
 celery-stats:
 	@echo "$(GREEN)Celery worker statistics...$(NC)"
-	@docker compose -f dev.yml exec celery_worker celery -A src.tasks.celery_app inspect stats
+	@docker-compose -f dev.yml exec celery_worker celery -A src.tasks.celery_app inspect stats
 
 celery-purge:
 	@echo "$(YELLOW)Purging all Celery tasks...$(NC)"
-	@docker compose -f dev.yml exec celery_worker celery -A src.tasks.celery_app purge -f
+	@docker-compose -f dev.yml exec celery_worker celery -A src.tasks.celery_app purge -f
 
 # ==============================================================================
 # Production Commands
@@ -216,26 +216,31 @@ celery-purge:
 
 prod:
 	@echo "$(GREEN)Starting production services...$(NC)"
-	@docker compose -f prod.yml up
+	@docker-compose -f prod.yml up
 
 prod-detach:
 	@echo "$(GREEN)Starting production services in background...$(NC)"
-	@docker compose -f prod.yml up -d
+	@docker-compose -f prod.yml up -d
 
 prod-build:
 	@echo "$(GREEN)Building and starting production services...$(NC)"
-	@docker compose -f prod.yml up --build -d
+	@docker-compose -f prod.yml up --build -d
 
 build-prod: prod-build
 
 stop-prod:
-	@docker compose -f prod.yml stop
+	@docker-compose -f prod.yml stop
 
 status-prod:
-	@docker compose -f prod.yml ps
+	@docker-compose -f prod.yml ps
 
 logs-prod:
-	@docker compose -f prod.yml logs -f $(container)
+	@docker-compose -f prod.yml logs -f $(container)
+
+migrate-prod:
+	@echo "$(GREEN)Running production migrations...$(NC)"
+	@docker-compose -f prod.yml exec -T api alembic upgrade head
+	@echo "$(GREEN)✅ Migrations applied successfully!$(NC)"
 
 # ==============================================================================
 # Cleanup Commands
@@ -243,12 +248,12 @@ logs-prod:
 
 clean:
 	@echo "$(YELLOW)Stopping and removing all containers...$(NC)"
-	@docker compose -f dev.yml down -v
-	@docker compose -f prod.yml down -v
+	@docker-compose -f dev.yml down -v
+	@docker-compose -f prod.yml down -v
 	@echo "$(GREEN)Cleanup complete$(NC)"
 
 clean-prod:
-	@docker compose -f prod.yml down --remove-orphans
+	@docker-compose -f prod.yml down --remove-orphans
 
 clean-all:
 	@echo "$(YELLOW)⚠️  WARNING: This will remove ALL Docker resources!$(NC)"
