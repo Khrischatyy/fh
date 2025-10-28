@@ -1,0 +1,1 @@
+export {default as EquipmentChoose} from './ui/EquipmentChoose.vue';

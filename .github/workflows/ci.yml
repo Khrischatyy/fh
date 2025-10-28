@@ -1,0 +1,45 @@
+#name: CI/CD Pipeline
+#
+#on:
+#  push:
+#    branches:
+#      - main
+#  pull_request:
+#    branches:
+#      - main
+#
+#jobs:
+#  build:
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v2
+#
+#  deploy:
+#    needs: build
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v2
+#
+#      - name: Set up SSH
+#        uses: webfactory/ssh-agent@v0.5.3
+#        with:
+#          ssh-private-key: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
+#
+#      - name: Add SSH key to known hosts
+#        run: |
+#          mkdir -p ~/.ssh
+#          ssh-keyscan -H ${{ secrets.AWS_INSTANCE_IP }} >> ~/.ssh/known_hosts
+#
+#      - name: Deploy to server
+#        env:
+#          HOST_USER: ${{ secrets.AWS_USER }}
+#          HOST_IP: ${{ secrets.AWS_INSTANCE_IP }}
+#        run: |
+#          ssh -o StrictHostKeyChecking=no $HOST_USER@$HOST_IP "
+#            cd /home/ubuntu/funny-how &&
+#            sudo chown -R $HOST_USER:$HOST_USER /home/ubuntu/funny-how &&
+#            make update-prod-container"

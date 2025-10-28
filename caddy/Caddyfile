@@ -1,0 +1,43 @@
+{
+    # Global options
+    auto_https off
+}
+
+:80 {
+    # Enable logging
+    log {
+        output stdout
+        format console
+    }
+
+    # FastAPI endpoints - /api, /docs, /redoc, /openapi.json
+    handle /api/* {
+        reverse_proxy api:8000
+    }
+
+    handle /docs {
+        reverse_proxy api:8000
+    }
+
+    handle /docs/* {
+        reverse_proxy api:8000
+    }
+
+    handle /redoc {
+        reverse_proxy api:8000
+    }
+
+    handle /openapi.json {
+        reverse_proxy api:8000
+    }
+
+    # Socket.io chat service
+    handle /socket.io/* {
+        reverse_proxy chat:6001
+    }
+
+    # Frontend (Nuxt) - handle all other requests
+    handle /* {
+        reverse_proxy frontend:3000
+    }
+}

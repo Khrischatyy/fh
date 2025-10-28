@@ -1,116 +1,122 @@
-.PHONY: help dev prod test clean migrate upgrade downgrade shell format lint install
+.PHONY: help dev prod test clean migrate
 
 # Colors for output
 GREEN := \033[0;32m
 YELLOW := \033[0;33m
+BLUE := \033[0;34m
 NC := \033[0m # No Color
 
 help:
-	@echo "$(GREEN)Funny How FastAPI Backend - Available Commands$(NC)"
+	@echo "$(GREEN)===========================================$(NC)"
+	@echo "$(GREEN)Funny-How Platform - Available Commands$(NC)"
+	@echo "$(GREEN)===========================================$(NC)"
 	@echo ""
-	@echo "$(YELLOW)Development:$(NC)"
-	@echo "  make dev              - Build and run all services with Nginx (port 80)"
-	@echo "  make dev-detach       - Run development server in background"
-	@echo "  make dev-build        - Force rebuild and start development services"
-	@echo "  make logs             - View API logs (follow mode)"
+	@echo "$(BLUE)📦 Development:$(NC)"
+	@echo "  make build            - Build all containers"
+	@echo "  make dev              - Start all services (foreground)"
+	@echo "  make dev-detach       - Start all services (background)"
+	@echo "  make dev-build        - Build and start all services"
+	@echo "  make stop             - Stop all services"
+	@echo "  make restart          - Restart all services"
+	@echo "  make status           - Show container status"
+	@echo "  make logs             - View logs (use container=<name> for specific)"
 	@echo "  make logs-all         - View all service logs"
-	@echo "  make restart          - Restart API container"
 	@echo ""
-	@echo "$(YELLOW)Production:$(NC)"
-	@echo "  make prod             - Run production server"
-	@echo "  make prod-detach      - Run production in background"
-	@echo "  make prod-build       - Force rebuild and start production"
+	@echo "$(BLUE)🚀 FastAPI Backend:$(NC)"
+	@echo "  make migrate                 - Apply FastAPI migrations"
+	@echo "  make migrate-create          - Create new migration (message='...')"
+	@echo "  make migrate-down            - Rollback last migration"
+	@echo "  make test                    - Run FastAPI tests"
+	@echo "  make format                  - Format Python code"
+	@echo "  make lint                    - Lint Python code"
+	@echo "  make routes                  - List FastAPI routes"
+	@echo "  make shell                   - Open Python shell"
 	@echo ""
-	@echo "$(YELLOW)Database Migrations:$(NC)"
-	@echo "  make migrate          - Apply all pending migrations"
-	@echo "  make migrate-create   - Create new migration (requires message='description')"
-	@echo "  make migrate-down     - Rollback last migration"
-	@echo "  make migrate-history  - Show migration history"
+	@echo "$(BLUE)💾 Database:$(NC)"
+	@echo "  make db-shell          - Open PostgreSQL shell"
+	@echo "  make db-reset          - Reset database (WARNING: destructive)"
 	@echo ""
-	@echo "$(YELLOW)Testing:$(NC)"
-	@echo "  make test             - Run all tests with coverage"
-	@echo "  make test-verbose     - Run tests with verbose output"
-	@echo "  make test-watch       - Run tests in watch mode"
+	@echo "$(BLUE)🎨 Frontend:$(NC)"
+	@echo "  make npm-install       - Install npm dependencies"
+	@echo "  make update-frontend   - Restart frontend container"
 	@echo ""
-	@echo "$(YELLOW)Code Quality:$(NC)"
-	@echo "  make format           - Format code with black and ruff"
-	@echo "  make lint             - Run linting checks"
-	@echo "  make type-check       - Run mypy type checking"
+	@echo "$(BLUE)🧹 Cleanup:$(NC)"
+	@echo "  make clean             - Stop and remove all containers"
+	@echo "  make clean-all         - Remove ALL Docker resources (CAUTION)"
 	@echo ""
-	@echo "$(YELLOW)Database:$(NC)"
-	@echo "  make db-shell         - Open PostgreSQL shell"
-	@echo "  make db-reset         - Reset database (WARNING: destructive)"
+	@echo "$(YELLOW)📍 Service URLs:$(NC)"
+	@echo "  - FastAPI:          http://localhost (docs: /docs)"
+	@echo "  - Frontend:         http://localhost:3000"
+	@echo "  - Chat:             http://localhost:6001"
 	@echo ""
-	@echo "$(YELLOW)Utilities:$(NC)"
-	@echo "  make shell            - Open Python shell in container"
-	@echo "  make routes           - List all API routes (like 'php artisan route:list')"
-	@echo "  make clean            - Stop and remove all containers and volumes"
-	@echo "  make stop             - Stop all containers"
-	@echo "  make ps               - Show running containers"
-	@echo "  make install          - Install dependencies locally with uv"
-	@echo ""
-	@echo "$(YELLOW)Quick Start:$(NC)"
-	@echo "  1. make dev-build     - Build and start all services"
-	@echo "  2. make migrate       - Run database migrations"
-	@echo "  3. Visit http://localhost or http://localhost/docs"
 
 # ==============================================================================
 # Development Commands
 # ==============================================================================
 
+build:
+	@echo "$(GREEN)Building all containers...$(NC)"
+	@docker compose -f dev.yml build
+
 dev:
-	@echo "$(GREEN)Starting development services...$(NC)"
-	docker-compose -f dev.yml up
+	@echo "$(GREEN)Starting all services...$(NC)"
+	@docker compose -f dev.yml up
 
 dev-detach:
-	@echo "$(GREEN)Starting development services in background...$(NC)"
-	docker-compose -f dev.yml up -d
-	@echo "$(GREEN)Services started! API available at: http://localhost$(NC)"
-	@echo "$(GREEN)API Docs: http://localhost/docs$(NC)"
-	@echo "$(GREEN)RabbitMQ Management: http://localhost:15672$(NC)"
+	@echo "$(GREEN)Starting all services in background...$(NC)"
+	@docker compose -f dev.yml up -d
+	@echo ""
+	@echo "$(GREEN)✅ Services started!$(NC)"
+	@echo "  - FastAPI:    $(BLUE)http://localhost$(NC) (docs: /docs)"
+	@echo "  - Frontend:   $(BLUE)http://localhost:3000$(NC)"
+	@echo "  - Chat:       $(BLUE)http://localhost:6001$(NC)"
+	@echo ""
 
 dev-build:
-	@echo "$(GREEN)Building and starting development services...$(NC)"
-	docker-compose -f dev.yml up --build
+	@echo "$(GREEN)Building and starting all services...$(NC)"
+	@docker compose -f dev.yml up --build
+
+start: dev
+
+stop:
+	@echo "$(YELLOW)Stopping all services...$(NC)"
+	@docker compose -f dev.yml down
+	@echo "$(GREEN)All services stopped$(NC)"
+
+restart: stop dev-detach
+
+status:
+	@echo "$(GREEN)Service Status:$(NC)"
+	@docker compose -f dev.yml ps
 
 logs:
-	docker-compose -f dev.yml logs -f api
+	@docker compose -f dev.yml logs -f $(container)
 
 logs-all:
-	docker-compose -f dev.yml logs -f
+	@docker compose -f dev.yml logs -f
 
-logs-nginx:
-	docker-compose -f dev.yml logs -f nginx
+logs-api:
+	@docker compose -f dev.yml logs -f api
 
-restart:
-	@echo "$(GREEN)Restarting API container...$(NC)"
-	docker-compose -f dev.yml restart api
+logs-celery:
+	@docker compose -f dev.yml logs -f celery_worker
 
-# ==============================================================================
-# Production Commands
-# ==============================================================================
+logs-frontend:
+	@docker compose -f dev.yml logs -f frontend
 
-prod:
-	@echo "$(GREEN)Starting production services...$(NC)"
-	docker-compose -f prod.yml up
+logs-caddy:
+	@docker compose -f dev.yml logs -f caddy
 
-prod-detach:
-	@echo "$(GREEN)Starting production services in background...$(NC)"
-	docker-compose -f prod.yml up -d
-	@echo "$(GREEN)Production services started! API available at: http://localhost$(NC)"
-
-prod-build:
-	@echo "$(GREEN)Building and starting production services...$(NC)"
-	docker-compose -f prod.yml up --build -d
+ps: status
 
 # ==============================================================================
-# Database Migration Commands
+# FastAPI Backend Commands
 # ==============================================================================
 
 migrate:
-	@echo "$(GREEN)Applying database migrations...$(NC)"
-	docker-compose -f dev.yml exec api alembic upgrade head
-	@echo "$(GREEN)Migrations applied successfully!$(NC)"
+	@echo "$(GREEN)Applying FastAPI migrations...$(NC)"
+	@docker compose -f dev.yml exec api alembic upgrade head
+	@echo "$(GREEN)✅ Migrations applied successfully!$(NC)"
 
 migrate-create:
 	@if [ -z "$(message)" ]; then \
@@ -118,86 +124,43 @@ migrate-create:
 		exit 1; \
 	fi
 	@echo "$(GREEN)Creating new migration: $(message)$(NC)"
-	docker-compose -f dev.yml exec api alembic revision --autogenerate -m "$(message)"
+	@docker compose -f dev.yml exec api alembic revision --autogenerate -m "$(message)"
 
 migrate-down:
 	@echo "$(YELLOW)Rolling back last migration...$(NC)"
-	docker-compose -f dev.yml exec api alembic downgrade -1
+	@docker compose -f dev.yml exec api alembic downgrade -1
 	@echo "$(GREEN)Rollback complete$(NC)"
 
 migrate-history:
-	@echo "$(GREEN)Migration history:$(NC)"
-	docker-compose -f dev.yml exec api alembic history
-
-migrate-current:
-	@echo "$(GREEN)Current migration:$(NC)"
-	docker-compose -f dev.yml exec api alembic current
-
-# Local migrations (without Docker)
-migrate-local:
-	@echo "$(GREEN)Applying migrations locally...$(NC)"
-	alembic upgrade head
-
-migrate-create-local:
-	@if [ -z "$(message)" ]; then \
-		echo "$(YELLOW)Usage: make migrate-create-local message='your migration description'$(NC)"; \
-		exit 1; \
-	fi
-	alembic revision --autogenerate -m "$(message)"
-
-migrate-down-local:
-	alembic downgrade -1
-
-# ==============================================================================
-# Testing Commands
-# ==============================================================================
+	@docker compose -f dev.yml exec api alembic history
 
 test:
-	@echo "$(GREEN)Running tests with coverage...$(NC)"
-	docker-compose -f dev.yml exec api pytest tests/ -v --cov=src --cov-report=term-missing
+	@echo "$(GREEN)Running FastAPI tests...$(NC)"
+	@docker compose -f dev.yml exec api pytest tests/ -v --cov=src --cov-report=term-missing
 
 test-verbose:
-	docker-compose -f dev.yml exec api pytest tests/ -vv
-
-test-watch:
-	docker-compose -f dev.yml exec api pytest tests/ -v --cov=src -f
-
-test-local:
-	@echo "$(GREEN)Running tests locally...$(NC)"
-	pytest tests/ -v --cov=src --cov-report=term-missing
-
-test-cov-html:
-	@echo "$(GREEN)Generating HTML coverage report...$(NC)"
-	docker-compose -f dev.yml exec api pytest tests/ --cov=src --cov-report=html
-	@echo "$(GREEN)Coverage report generated in htmlcov/index.html$(NC)"
-
-# ==============================================================================
-# Code Quality Commands
-# ==============================================================================
+	@docker compose -f dev.yml exec api pytest tests/ -vv
 
 format:
-	@echo "$(GREEN)Formatting code with black...$(NC)"
-	black src/ tests/
-	@echo "$(GREEN)Fixing issues with ruff...$(NC)"
-	ruff check --fix src/ tests/
+	@echo "$(GREEN)Formatting Python code...$(NC)"
+	@cd backend && black src/ tests/
+	@cd backend && ruff check --fix src/ tests/
 
 lint:
-	@echo "$(GREEN)Checking code style with black...$(NC)"
-	black --check src/ tests/
-	@echo "$(GREEN)Linting with ruff...$(NC)"
-	ruff check src/ tests/
+	@echo "$(GREEN)Linting Python code...$(NC)"
+	@cd backend && black --check src/ tests/
+	@cd backend && ruff check src/ tests/
 
-type-check:
-	@echo "$(GREEN)Running type checks with mypy...$(NC)"
-	mypy src/
+shell:
+	@echo "$(GREEN)Opening Python shell...$(NC)"
+	@docker compose -f dev.yml exec api python
 
-format-docker:
-	docker-compose -f dev.yml exec api black src/ tests/
-	docker-compose -f dev.yml exec api ruff check --fix src/ tests/
+shell-bash:
+	@docker compose -f dev.yml exec api /bin/sh
 
-lint-docker:
-	docker-compose -f dev.yml exec api black --check src/ tests/
-	docker-compose -f dev.yml exec api ruff check src/ tests/
+routes:
+	@echo "$(GREEN)Listing all FastAPI routes...$(NC)"
+	@docker compose -f dev.yml exec api python scripts/list_routes.py
 
 # ==============================================================================
 # Database Commands
@@ -205,74 +168,114 @@ lint-docker:
 
 db-shell:
 	@echo "$(GREEN)Opening PostgreSQL shell...$(NC)"
-	docker-compose -f dev.yml exec db psql -U postgres -d book_studio
+	@docker compose -f dev.yml exec db psql -U postgres -d book_studio
 
 db-reset:
-	@echo "$(YELLOW)WARNING: This will delete all data!$(NC)"
+	@echo "$(YELLOW)⚠️  WARNING: This will delete all data!$(NC)"
 	@echo -n "Are you sure? [y/N] " && read ans && [ $${ans:-N} = y ]
 	@echo "$(YELLOW)Resetting database...$(NC)"
-	docker-compose -f dev.yml exec api alembic downgrade base
-	docker-compose -f dev.yml exec api alembic upgrade head
+	@docker compose -f dev.yml exec api alembic downgrade base
+	@docker compose -f dev.yml exec api alembic upgrade head
 	@echo "$(GREEN)Database reset complete$(NC)"
 
 # ==============================================================================
-# Utility Commands
+# Frontend Commands
 # ==============================================================================
 
-shell:
-	@echo "$(GREEN)Opening Python shell in API container...$(NC)"
-	docker-compose -f dev.yml exec api python
+npm-install:
+	@echo "$(GREEN)Installing npm dependencies...$(NC)"
+	@docker compose -f dev.yml run --rm frontend sh -c "npm i"
 
-shell-bash:
-	@echo "$(GREEN)Opening bash shell in API container...$(NC)"
-	docker-compose -f dev.yml exec api /bin/sh
+npm-install-package:
+	@docker compose -f dev.yml run --rm frontend sh -c "npm i ${p}"
 
-routes:
-	@echo "$(GREEN)Listing all API routes...$(NC)"
-	@docker-compose -f dev.yml exec api python scripts/list_routes.py
+update-frontend:
+	@echo "$(GREEN)Restarting frontend container...$(NC)"
+	@docker compose -f dev.yml stop frontend
+	@docker compose -f dev.yml up -d frontend
+
+# ==============================================================================
+# Celery Commands
+# ==============================================================================
+
+celery-status:
+	@echo "$(GREEN)Checking Celery worker status...$(NC)"
+	@docker compose -f dev.yml exec celery_worker celery -A src.tasks.celery_app inspect active
+
+celery-stats:
+	@echo "$(GREEN)Celery worker statistics...$(NC)"
+	@docker compose -f dev.yml exec celery_worker celery -A src.tasks.celery_app inspect stats
+
+celery-purge:
+	@echo "$(YELLOW)Purging all Celery tasks...$(NC)"
+	@docker compose -f dev.yml exec celery_worker celery -A src.tasks.celery_app purge -f
+
+# ==============================================================================
+# Production Commands
+# ==============================================================================
+
+prod:
+	@echo "$(GREEN)Starting production services...$(NC)"
+	@docker compose -f prod.yml up
+
+prod-detach:
+	@echo "$(GREEN)Starting production services in background...$(NC)"
+	@docker compose -f prod.yml up -d
+
+prod-build:
+	@echo "$(GREEN)Building and starting production services...$(NC)"
+	@docker compose -f prod.yml up --build -d
+
+build-prod: prod-build
+
+stop-prod:
+	@docker compose -f prod.yml stop
+
+status-prod:
+	@docker compose -f prod.yml ps
+
+logs-prod:
+	@docker compose -f prod.yml logs -f $(container)
+
+# ==============================================================================
+# Cleanup Commands
+# ==============================================================================
 
 clean:
-	@echo "$(YELLOW)Stopping and removing all containers, networks, and volumes...$(NC)"
-	docker-compose -f dev.yml down -v
-	docker-compose -f prod.yml down -v
+	@echo "$(YELLOW)Stopping and removing all containers...$(NC)"
+	@docker compose -f dev.yml down -v
+	@docker compose -f prod.yml down -v
 	@echo "$(GREEN)Cleanup complete$(NC)"
 
-stop:
-	@echo "$(YELLOW)Stopping all containers...$(NC)"
-	docker-compose -f dev.yml down
-	docker-compose -f prod.yml down
-	@echo "$(GREEN)All containers stopped$(NC)"
+clean-prod:
+	@docker compose -f prod.yml down --remove-orphans
 
-ps:
-	@echo "$(GREEN)Running containers:$(NC)"
-	docker-compose -f dev.yml ps
-
-install:
-	@echo "$(GREEN)Installing dependencies locally with uv...$(NC)"
-	@if ! command -v uv &> /dev/null; then \
-		echo "$(YELLOW)Installing uv...$(NC)"; \
-		curl -LsSf https://astral.sh/uv/install.sh | sh; \
-	fi
-	uv pip install -e ".[dev]"
-	@echo "$(GREEN)Dependencies installed$(NC)"
-
-install-prod:
-	@echo "$(GREEN)Installing production dependencies with uv...$(NC)"
-	uv pip install -e ".[prod]"
+clean-all:
+	@echo "$(YELLOW)⚠️  WARNING: This will remove ALL Docker resources!$(NC)"
+	@echo -n "Are you sure? [y/N] " && read ans && [ $${ans:-N} = y ]
+	@docker ps -a -q | xargs -r docker rm -f
+	@docker volume ls -q | xargs -r docker volume rm
+	@docker network ls --format '{{.Name}}' | awk '$$1 !~ /^(bridge|host|none)$$/' | xargs -r docker network rm
+	@echo "$(GREEN)All Docker resources removed$(NC)"
 
 # ==============================================================================
-# Docker Compose shortcuts
+# Quick Setup
 # ==============================================================================
 
-build:
-	docker-compose -f dev.yml build
-
-build-prod:
-	docker-compose -f prod.yml build
-
-up: dev-detach
-
-down: stop
+setup: dev-build migrate
+	@echo ""
+	@echo "$(GREEN)=========================================$(NC)"
+	@echo "$(GREEN)✅ Setup Complete!$(NC)"
+	@echo "$(GREEN)=========================================$(NC)"
+	@echo ""
+	@echo "Your services are now running at:"
+	@echo "  - FastAPI:    $(GREEN)http://localhost$(NC) (docs: /docs)"
+	@echo "  - Frontend:   $(GREEN)http://localhost:3000$(NC)"
+	@echo "  - Chat:       $(GREEN)http://localhost:6001$(NC)"
+	@echo ""
+	@echo "To view logs: $(YELLOW)make logs-all$(NC)"
+	@echo "To stop services: $(YELLOW)make stop$(NC)"
+	@echo ""
 
 # ==============================================================================
 # Health Checks
@@ -280,27 +283,24 @@ down: stop
 
 health:
 	@echo "$(GREEN)Checking service health...$(NC)"
-	@curl -f http://localhost/health || echo "$(YELLOW)API not responding$(NC)"
-
-status:
-	@echo "$(GREEN)Service Status:$(NC)"
-	@docker-compose -f dev.yml ps
+	@curl -f http://localhost/health || echo "$(YELLOW)FastAPI not responding$(NC)"
 
 # ==============================================================================
-# Quick setup for new developers
+# Git
 # ==============================================================================
 
-setup: dev-build migrate
-	@echo ""
-	@echo "$(GREEN)========================================$(NC)"
-	@echo "$(GREEN)Setup Complete!$(NC)"
-	@echo "$(GREEN)========================================$(NC)"
-	@echo ""
-	@echo "Your API is now running at:"
-	@echo "  - API: $(GREEN)http://localhost$(NC)"
-	@echo "  - Docs: $(GREEN)http://localhost/docs$(NC)"
-	@echo "  - RabbitMQ: $(GREEN)http://localhost:15672$(NC) (guest/guest)"
-	@echo ""
-	@echo "To view logs: $(YELLOW)make logs$(NC)"
-	@echo "To stop services: $(YELLOW)make stop$(NC)"
-	@echo ""
+pull:
+	git pull
+
+# ==============================================================================
+# Utilities
+# ==============================================================================
+
+install:
+	@echo "$(GREEN)Installing Python dependencies locally with uv...$(NC)"
+	@if ! command -v uv &> /dev/null; then \
+		echo "$(YELLOW)Installing uv...$(NC)"; \
+		curl -LsSf https://astral.sh/uv/install.sh | sh; \
+	fi
+	cd backend && uv pip install -e ".[dev]"
+	@echo "$(GREEN)Dependencies installed$(NC)"

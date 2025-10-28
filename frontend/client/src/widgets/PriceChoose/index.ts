@@ -1,0 +1,1 @@
+export {default as PriceChoose} from './ui/PriceChoose.vue';

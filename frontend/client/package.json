@@ -1,0 +1,48 @@
+{
+  "name": "funny-how",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "start": "nuxt start"
+  },
+  "devDependencies": {
+    "@nuxt/devtools": "latest",
+    "@nuxtjs/tailwindcss": "^6.8.0",
+    "dotenv": "^16.4.5",
+    "happy-dom": "^12.10.3",
+    "nuxt": "^3.10.2",
+    "nuxt-particles": "^0.1.5",
+    "sass": "^1.69.4",
+    "vue": "^3.4.19",
+    "vue-router": "^4.2.5"
+  },
+  "dependencies": {
+    "@fawmi/vue-google-maps": "^0.9.79",
+    "@googlemaps/js-api-loader": "^1.16.6",
+    "@nuxtjs/onesignal": "^3.0.0-beta.16",
+    "@nuxtjs/pwa": "^3.3.5",
+    "@pinia/nuxt": "^0.5.1",
+    "@stripe/connect-js": "^3.3.10",
+    "@stripe/stripe-js": "^4.1.0",
+    "@tsparticles/all": "^3.2.2",
+    "@types/dotenv": "^8.2.0",
+    "@types/socket.io-client": "^3.0.0",
+    "@types/three": "^0.162.0",
+    "@vueuse/nuxt": "^10.5.0",
+    "animate.css": "^4.1.1",
+    "axios": "^1.5.1",
+    "photoswipe": "^5.4.4",
+    "pinia": "^2.1.7",
+    "socket.io-client": "^4.8.1",
+    "three": "^0.161.0",
+    "vue3-google-map": "^0.20.0"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-arm64-musl": "^4.52.5"
+  }
+}

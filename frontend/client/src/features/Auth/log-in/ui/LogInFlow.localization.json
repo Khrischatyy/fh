@@ -1,0 +1,10 @@
+{
+  "ru": {
+    "login_field_label": "Ваш Логин *",
+    "login_field_placeholder": "Ваш Логин *",
+    "remember_me_button_text": "Запомнить меня",
+    "register_button_text": "Зарегистрироваться",
+    "log_in_button_text": "Войти",
+    "forgot_password_button_text": "Забыли пароль?"
+  }
+}

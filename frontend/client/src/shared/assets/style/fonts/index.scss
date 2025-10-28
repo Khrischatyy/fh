@@ -1,0 +1,87 @@
+@mixin use-font(
+  $font_name,
+  $file_path_without_ext,
+  $weight: normal,
+  $style: normal
+) {
+  @font-face {
+    font-family: quote($font_name);
+    src: url("#{$file_path_without_ext}.woff") format("woff"),
+      url("#{$file_path_without_ext}.woff2") format("woff2"),
+      url("#{$file_path_without_ext}.ttf") format("truetype");
+    font-weight: $weight;
+    font-style: $style;
+    font-display: swap;
+  }
+}
+
+@mixin use-variable-font(
+  $font_name,
+  $file_path_without_ext,
+  $weight_range: "100 900",
+  $stretch_range: "75% 125%",
+  $style: normal
+) {
+  @font-face {
+    font-family: quote($font_name);
+    src: url("#{$file_path_without_ext}.woff2") format("woff2"),
+      url("#{$file_path_without_ext}.ttf") format("truetype");
+    font-weight: $weight_range;
+    font-stretch: $stretch_range;
+    font-style: $style;
+    font-display: swap;
+  }
+}
+
+$font-path: "/fonts/";
+$font-path-montserrat: $font-path + "Montserrat/";
+$font-path-bebas: $font-path + "BebasNeue/";
+
+// @include use-font(
+//   Montserrat,
+//   $font-path-montserrat + "Montserrat",
+//   400,
+//   normal
+// );
+// @include use-font(
+//   Montserrat,
+//   $font-path-montserrat + "Italic/Montserrat-Italic",
+//   400,
+//   italic
+// );
+
+@include use-font(BebasNeue, $font-path-bebas + "BebasNeue", 400, normal);
+
+@include use-font(
+  Roboto,
+  $font-path + "Roboto/Regular/Roboto-Regular",
+  400,
+  normal
+);
+@include use-font(Roboto, $font-path + "Roboto/Bold/Roboto-Bold", 700, normal);
+@include use-font(
+  Roboto,
+  $font-path + "Roboto/Italic/Roboto-Italic",
+  400,
+  italic
+);
+@include use-font(
+  Roboto,
+  $font-path + "Roboto/BoldItalic/Roboto-BoldItalic",
+  700,
+  italic
+);
+
+// Variable fonts
+$font-path-montserrat-variable: $font-path + "Montserrat/Variable/";
+@include use-variable-font(
+  Montserrat,
+  $font-path-montserrat-variable + "Montserrat-VariableFont_wght"
+);
+@include use-variable-font(
+  Montserrat,
+  $font-path-montserrat-variable + "Montserrat-Italic-VariableFont_wght",
+  "100 900",
+  "75% 125%",
+  italic
+);

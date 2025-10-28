@@ -1,0 +1,35 @@
+FROM node:20.11.0-alpine
+
+# Define environment variables and build arguments
+ENV HOST=0.0.0.0
+ARG AXIOS_BASEURL
+ARG AXIOS_BASEURL_CLIENT
+ARG AXIOS_API_VERSION
+ARG AXIOS_FRONTEND
+ARG AXIOS_BROWSER_BASEURL
+ARG GOOGLE_MAPS_API
+ENV NUXT_ENV_GOOGLE_MAPS_API=$GOOGLE_MAPS_API
+
+# Set the working directory
+WORKDIR /usr/src/app
+
+# Update apk and install dependencies
+RUN apk update
+
+# Copy package.json and package-lock.json
+COPY package.json package-lock.json ./
+
+# Install npm dependencies
+RUN npm ci
+
+# Copy the rest of the application code
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# Expose the necessary port
+EXPOSE 3000
+
+# Start the server
+CMD ["node", "/usr/src/app/.output/server/index.mjs"]
