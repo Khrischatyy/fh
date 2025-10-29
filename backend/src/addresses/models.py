@@ -120,11 +120,6 @@ class Address(Base, IDMixin, TimestampMixin):
         secondary=address_badge,
         back_populates="addresses",
     )
-    bookings: Mapped[list["Booking"]] = relationship(
-        "Booking",
-        back_populates="address",
-        cascade="all, delete-orphan",
-    )
     messages: Mapped[list["Message"]] = relationship(
         "Message",
         back_populates="address",

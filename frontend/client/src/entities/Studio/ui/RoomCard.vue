@@ -188,9 +188,9 @@ const badgeIndex = ref(0)
 
 const displayedPhotos = computed(() => {
   let defaultPhotos = [
-    { url: defaultPhoto3_1 },
-    { url: defaultPhoto3_2 },
-    { url: defaultPhoto3_3 },
+    { path: defaultPhoto3_1 },
+    { path: defaultPhoto3_2 },
+    { path: defaultPhoto3_3 },
   ]
 
   return props.room.photos

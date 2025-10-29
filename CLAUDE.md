@@ -8,11 +8,11 @@ Funny-how is a studio booking platform with two backend implementations (Laravel
 
 ## Repository Structure
 
-- `backend/` - Laravel 9 PHP backend (legacy)
-- `new_backend/` - FastAPI Python backend (current/preferred)
+- `backend/` - FastAPI Python backend (current/preferred)
+- `laravel/` - Laravel 9 PHP backend (legacy)
 - `frontend/client/` - Nuxt 3 client application
 - `frontend/chat/` - Socket.io chat service (Express.js)
-- `proxy/` - Nginx reverse proxy configuration
+- `caddy/` - Caddy reverse proxy configuration
 
 ## Development Commands
 
@@ -52,9 +52,9 @@ make npm-install        # Install npm dependencies
 make npm-install-package p=<package>  # Install specific package
 ```
 
-### FastAPI Backend (new_backend/)
+### FastAPI Backend (backend/)
 
-Navigate to `new_backend/` directory first. Commands use `new_backend/Makefile`:
+Commands are run from the root directory using Docker Compose:
 
 ```bash
 # Development
@@ -101,29 +101,22 @@ make update-frontend    # Restart frontend container
 ### Production Deployment
 
 ```bash
-# Root level (prod.yml)
-make build-prod
-make start-prod
-make migrate-prod
-make optimize-prod
-make seeds-prod
-
-# FastAPI (new_backend/)
-make prod-build
-make prod-detach
+# Using prod.yml
+docker compose -f prod.yml up -d --build
+docker compose -f prod.yml exec api alembic upgrade head
 ```
 
 ## Architecture
 
-### FastAPI Backend (new_backend/) - Module-Functionality Pattern
+### FastAPI Backend (backend/) - Module-Functionality Pattern
 
-The new backend follows a layered architecture with clear separation of concerns:
+The backend follows a layered architecture with clear separation of concerns:
 
 **Layer Flow:** Router → Service → Repository → Models
 
 **Module Structure:**
 ```
-src/{domain}/
+backend/src/{domain}/
 ├── router.py          # API endpoints, HTTP handling
 ├── schemas.py         # Pydantic request/response models
 ├── models.py          # SQLAlchemy database models
@@ -136,13 +129,15 @@ src/{domain}/
 - `auth/` - Authentication & user management (JWT, Google OAuth)
 - `users/` - User profile management
 - `companies/` - Studio/business entities
-- `addresses/` - Studio locations with geolocation
+- `addresses/` - Studio locations with geolocation and operating hours
 - `rooms/` - Bookable spaces with pricing
 - `bookings/` - Reservation system with availability checking
+- `operating_hours/` - Studio operating hours management (modes: 24/7, fixed, variable)
 - `payments/` - Multi-gateway (Stripe, Square) payment processing
 - `messages/` - Direct messaging between users and studio owners
 - `geographic/` - Countries, cities reference data
 - `tasks/` - Celery background tasks (email, bookings, payments)
+- `teams/` - Studio team members/engineers
 
 **Important Patterns:**
 - Services contain all business logic (slug generation, validation)
@@ -162,7 +157,51 @@ src/{domain}/
 - Task modules in `src/tasks/`
 - Email notifications, payment processing, booking cleanup
 
-### Laravel Backend (backend/) - Legacy
+### Bookings Module - Availability System
+
+The bookings module implements a sophisticated availability checking system:
+
+**Key Components:**
+
+1. **Operating Hours (3 Modes):**
+   - **Mode 1 (24/7)**: Studio operates 24 hours, 7 days a week
+   - **Mode 2 (Fixed)**: Same hours every day
+   - **Mode 3 (Variable)**: Different hours per day of week (0=Sunday, 6=Saturday)
+
+2. **Availability Logic:**
+   - Checks room operating hours for selected date
+   - Excludes existing bookings (except cancelled/expired)
+   - Rounds current time up to next hour for today's bookings
+   - Returns available slots in 1-hour increments
+   - Handles timezone-aware datetime calculations using pytz
+
+3. **API Endpoints:**
+   ```
+   GET /api/address/reservation/start-time?room_id={id}&date={YYYY-MM-DD}
+   - Returns available start times for a room on a specific date
+   - Response: {"available_times": [{"time": "10:00", "iso_string": "2025-10-31T10:00:00+01:00"}, ...]}
+
+   GET /api/address/reservation/end-time?room_id={id}&date={YYYY-MM-DD}&start_time={HH:MM}
+   - Returns available end times from a given start time
+   - Checks for booking conflicts and respects operating hours
+   - Response: {"available_times": [{"time": "11:00", "iso_string": "2025-10-31T11:00:00+01:00"}, ...]}
+   ```
+
+4. **Models:**
+   - `Booking`: room_id, user_id, status_id, date, start_time, end_time, end_date (for multi-day)
+   - `BookingStatus`: pending, confirmed, cancelled, expired, completed
+   - `OperatingHour` (in addresses module): mode_id, day_of_week, open_time, close_time, is_closed
+
+5. **Type Aliasing:**
+   - Uses `from datetime import date as date_type, time as time_type` to avoid Pydantic field name conflicts
+
+**Important Notes:**
+- Always use `.path` for photo URLs in frontend, not `.url`
+- Frontend TimeSelect component expects `{time, iso_string}` format from backend
+- Operating hours are stored in `addresses.operating_hours` relationship
+- Bookings exclude `cancelled` and `expired` statuses when checking availability
+
+### Laravel Backend (laravel/) - Legacy
 
 Standard Laravel 9 structure. Prefer using FastAPI backend for new features.
 
@@ -192,152 +231,183 @@ Express.js with Socket.io for real-time messaging. Connects to Redis and Postgre
 
 ## Docker Services
 
-**Development (dev.yml):**
-- `nginx` - Reverse proxy (port 8888)
-- `db` - PostgreSQL 16 (port 5433)
-- `backend` - Laravel PHP-FPM
+**Current Setup (dev.yml):**
+- `caddy` - Caddy reverse proxy (ports 80, 443)
+- `api` - FastAPI application (internal port 8000)
 - `frontend` - Nuxt 3 dev server (port 3000)
-- `redis` - Redis 7.0 (port 6380)
-- `rabbitmq` - RabbitMQ 3.13 with management (ports 5673, 15673)
-- `queue-worker` - Laravel queue worker
-- `scheduler` - Laravel task scheduler
+- `db` - PostgreSQL 16 (port 5432)
+- `redis` - Redis 7.0 (port 6379)
+- `rabbitmq` - RabbitMQ 3.13 with management UI
+- `celery_worker` - Celery background worker
 - `chat` - Socket.io server (port 6001)
-- `swagger` - Swagger UI (port 8080)
-
-**FastAPI Services (new_backend/dev.yml):**
-- `api` - FastAPI application (port 80 via nginx)
-- `nginx` - Reverse proxy
-- `db` - PostgreSQL
-- `redis` - Redis
-- `rabbitmq` - RabbitMQ
-- `celery_worker` - Celery worker
 
 ## Key URLs
 
 **Development:**
-- Main app: http://127.0.0.1:8888 (or http://localhost:8888)
+- Main app: http://127.0.0.1 or http://localhost
+- FastAPI backend: http://127.0.0.1/api (proxied via Caddy)
+- FastAPI docs: http://127.0.0.1/docs
 - Frontend dev: http://localhost:3000
-- Swagger (Laravel): http://127.0.0.1:8080
-- FastAPI docs: http://localhost/docs (when in new_backend)
-- RabbitMQ Management: http://localhost:15673 (guest/guest)
+- Chat service: http://localhost:6001
+- PostgreSQL: localhost:5432
+- Redis: localhost:6379
 
 ## Important Notes
 
 ### Working with Migrations
 
-**Laravel:**
+**FastAPI (backend/):**
 ```bash
-make migrate              # Run migrations
-make rollback             # Rollback
-make artisan c="migrate:status"  # Check status
+# Using Docker
+docker compose -f dev.yml exec api alembic upgrade head
+docker compose -f dev.yml exec api alembic revision --autogenerate -m "description"
+docker compose -f dev.yml exec api alembic downgrade -1
+
+# Or from root directory (if Make commands exist)
+make migrate
+make migrate-create message="description"
+make migrate-down
 ```
 
-**FastAPI:**
+**Laravel (laravel/):**
 ```bash
-cd new_backend
-make migrate-create message="add users table"
-make migrate              # Apply migrations
-make migrate-down         # Rollback
+cd laravel
+php artisan migrate
+php artisan migrate:rollback
+php artisan migrate:status
 ```
 
 ### Testing
 
 **FastAPI:**
 ```bash
-cd new_backend
-make test                 # Run with coverage
-make test-verbose         # Detailed output
+docker compose -f dev.yml exec api pytest
+docker compose -f dev.yml exec api pytest -v  # Verbose
+docker compose -f dev.yml exec api pytest --cov  # With coverage
 ```
 
 ### Code Quality (FastAPI)
 
 ```bash
-cd new_backend
-make format               # Auto-format code
-make lint                 # Check code style
+docker compose -f dev.yml exec api black .
+docker compose -f dev.yml exec api ruff check .
 ```
 
 ### Environment Configuration
 
 - Root `.env` - Main configuration for all services
-- `new_backend/.env` - FastAPI-specific configuration
+- `backend/.env` - FastAPI-specific configuration
 - Copy from `.env.example` files when setting up
 
 ### Queue Workers
 
-**Laravel:** Queue worker runs automatically in `queue-worker` container
 **FastAPI:** Celery worker runs automatically in `celery_worker` container
+- Monitor tasks: `docker compose -f dev.yml logs -f celery_worker`
 
 ### Database Access
 
-**Laravel DB:**
+**PostgreSQL:**
 ```bash
 docker compose -f dev.yml exec db psql -U postgres -d funny_db
-```
-
-**FastAPI DB:**
-```bash
-cd new_backend
-make db-shell
+# Or use direct connection: psql -h localhost -p 5432 -U postgres -d funny_db
 ```
 
 ## Creating New Features
 
 ### In FastAPI Backend:
 
-1. Create module directory: `mkdir src/my_module && touch src/my_module/__init__.py`
-2. Create module files: `router.py`, `schemas.py`, `models.py`, `service.py`, `repository.py`, `dependencies.py`
-3. Define models inheriting from `Base`, `IDMixin`, `TimestampMixin`
-4. Create Pydantic schemas for validation
-5. Implement repository for data access
-6. Implement service for business logic
-7. Create router with FastAPI endpoints
-8. Register router in `src/main.py`
-9. Create migration: `make migrate-create message="add my_module"`
-10. Apply migration: `make migrate`
+1. Create module directory inside `backend/src/`:
+   ```bash
+   mkdir backend/src/my_module
+   touch backend/src/my_module/__init__.py
+   ```
 
-### In Laravel Backend:
+2. Create module files:
+   - `router.py` - API endpoints
+   - `schemas.py` - Pydantic models (request/response)
+   - `models.py` - SQLAlchemy database models
+   - `service.py` - Business logic
+   - `repository.py` - Data access layer
+   - `dependencies.py` - FastAPI dependencies
 
-Use standard Laravel conventions (controllers, models, migrations, routes).
+3. Define models inheriting from `Base`, `IDMixin`, `TimestampMixin` from `src/models.py`
+
+4. **Important**: Use type aliasing to avoid conflicts:
+   ```python
+   from datetime import date as date_type, time as time_type
+   ```
+
+5. Register router in `src/main.py`:
+   ```python
+   from src.my_module.router import router as my_module_router
+   app.include_router(my_module_router)
+   ```
+
+6. Create and apply migration:
+   ```bash
+   docker compose -f dev.yml exec api alembic revision --autogenerate -m "add my_module"
+   docker compose -f dev.yml exec api alembic upgrade head
+   ```
 
 ### In Frontend:
 
-Follow FSD methodology - place code in appropriate layer (features, entities, shared, etc.).
+Follow Feature-Sliced Design (FSD):
+- `pages/` - Page routes
+- `widgets/` - Complex UI blocks (TimeSelect, etc.)
+- `features/` - Business scenarios (DatePicker, etc.)
+- `entities/` - Business entities (Studio, Room, etc.)
+- `shared/` - Reusable UI components
+
+**Important**: Always use `.path` for photo/image URLs, not `.url`
 
 ## Common Workflows
 
 **Start development:**
 ```bash
-# Terminal 1 - Root services
-make build && make start
+# Start all services
+docker compose -f dev.yml up -d
 
-# Terminal 2 - FastAPI (optional)
-cd new_backend && make dev-build
+# View logs
+docker compose -f dev.yml logs -f
+
+# Specific service logs
+docker compose -f dev.yml logs -f api
+docker compose -f dev.yml logs -f frontend
 ```
 
 **Add new API endpoint (FastAPI):**
-1. Add method to service
-2. Add endpoint to router
-3. Test with `make test`
-4. Format with `make format`
+1. Add method to service layer
+2. Add endpoint to router with proper type hints
+3. Test the endpoint: `curl http://localhost/api/your-endpoint`
+4. Format code: `docker compose -f dev.yml exec api black .`
+5. Run tests: `docker compose -f dev.yml exec api pytest`
 
 **Update database schema:**
-1. Modify models
-2. Create migration
-3. Apply migration
-4. Update affected services/endpoints
+1. Modify models in `backend/src/{module}/models.py`
+2. Create migration: `docker compose -f dev.yml exec api alembic revision --autogenerate -m "description"`
+3. Review generated migration in `backend/alembic/versions/`
+4. Apply migration: `docker compose -f dev.yml exec api alembic upgrade head`
+5. Update affected services/repositories
 
-**View logs:**
+**Debug tips:**
 ```bash
-make logs-all                    # All services
-make logs container=backend      # Specific service
-cd new_backend && make logs      # FastAPI logs
+# Check container status
+docker compose -f dev.yml ps
+
+# Access container shell
+docker compose -f dev.yml exec api bash
+
+# Database shell
+docker compose -f dev.yml exec db psql -U postgres -d funny_db
+
+# View all logs
+docker compose -f dev.yml logs -f
 ```
 
 
 # Claude Code Default Prompt
 
-You are helping **Alex Khrishchatyi** rewrite the **Laravel backend (backend/)** to **FastAPI (new_backend/)**.
+You are helping **Alex Khrishchatyi** rewrite the **Laravel backend (laravel/)** to **FastAPI (backend/)**.
 
 ## Architecture
 Use **module-functionality structure** with separate layers:
@@ -345,8 +415,7 @@ Use **module-functionality structure** with separate layers:
 
 Example:
 ```
-
-new_backend/src/
+backend/src/
 ├── auth/
 │   ├── router.py
 │   ├── schemas.py
@@ -356,10 +425,17 @@ new_backend/src/
 │   ├── exceptions.py
 │   ├── constants.py
 │   └── dependencies.py
+├── bookings/
+│   ├── router.py
+│   ├── schemas.py
+│   ├── models.py
+│   ├── repository.py
+│   ├── service.py
+│   └── dependencies.py
 ├── config.py
 ├── database.py
+├── exceptions.py
 └── main.py
-
 ````
 
 ## Rules
@@ -408,3 +484,51 @@ new_backend/src/
 * Code must be **typed, modular, clean, and production-grade**.
 * `service` handles business logic, `repository` handles DB I/O only.
 * Follow **SOLID** and **Laravel-equivalent validation**.
+
+## Common Patterns and Best Practices
+
+1. **Type Aliasing**: Always use type aliases to avoid Pydantic field name conflicts
+   ```python
+   from datetime import date as date_type, time as time_type
+   ```
+
+2. **Photo URLs**: Frontend always uses `.path` property, not `.url`
+   ```python
+   # Backend model
+   photo.path  # ✓ Correct
+   photo.url   # ✗ Wrong - will cause undefined errors
+   ```
+
+3. **Operating Hours Logic**:
+   - Mode 1 (24/7): Returns first record
+   - Mode 2 (Fixed): Returns first record
+   - Mode 3 (Variable): Filter by `day_of_week` (0=Sunday, 6=Saturday)
+
+4. **Timezone Handling**: Always use pytz for timezone-aware datetime
+   ```python
+   import pytz
+   tz = pytz.timezone(address.timezone)  # e.g., "Europe/Belgrade"
+   now = datetime.now(tz)
+   ```
+
+5. **Response Format**: TimeSelect expects `{time: "HH:MM", iso_string: "ISO8601"}`
+   ```json
+   {
+     "available_times": [
+       {"time": "10:00", "iso_string": "2025-10-31T10:00:00+01:00"}
+     ]
+   }
+   ```
+
+6. **Booking Exclusions**: Always exclude cancelled and expired bookings when checking availability
+   ```python
+   excluded_statuses=['cancelled', 'expired']
+   ```
+
+7. **Relationship Loading**: Use `selectinload()` for one-to-many, `joinedload()` for many-to-one
+   ```python
+   .options(
+       selectinload(Room.address).selectinload(Address.operating_hours),
+       selectinload(Room.prices)
+   )
+   ```

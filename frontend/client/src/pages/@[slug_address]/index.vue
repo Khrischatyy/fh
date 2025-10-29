@@ -73,12 +73,6 @@
                 Studio name
               </div>
               <div class="flex gap-5 w-full">
-                <div v-if="address?.company?.logo_url">
-                  <img
-                      :src="address?.company?.logo_url"
-                      class="h-10 w-10 object-contain"
-                  />
-                </div>
                 <div class="font-[BebasNeue] w-full text-left">
                   {{ address?.company.name }}
                 </div>
@@ -190,7 +184,6 @@
               </a>
               <GoogleMap
                   class=""
-                  :logo="address?.company.logo_url"
                   :lat="address?.latitude"
                   :lng="address?.longitude"
               />
@@ -533,7 +526,7 @@ const pageDescription: Ref<string> = computed(() => {
 })
 const studioFirstPhoto: Ref<string> = computed(() => {
   return address.value && address?.value?.photos.length > 0
-      ? address?.value?.photos[0].url
+      ? address?.value?.photos[0].path
       : "/meta/open-graph-image.png"
 })
 const isLoading = ref(false)
@@ -588,12 +581,12 @@ const setSeoMeta = () => {
     ogTitle: `${address.value?.company.name} - Funny How`,
     ogDescription: () =>
         `Book a session at ${address.value.company.name} from $${address.value.prices[0]?.price_per_hour}/hour. Only at Funny-How.com`,
-    ogImage: () => `${address?.value?.photos[0].url}`,
+    ogImage: () => studioFirstPhoto.value,
     ogUrl: route.fullPath,
     twitterTitle: () => `${address.value?.company.name} - Funny How`,
     twitterDescription: () =>
         `Book a session at ${address.value.company.name} from $${address.value.prices[0]?.price_per_hour}/hour. Only at Funny-How.com`,
-    twitterImage: `${address?.value?.photos[0].url}`,
+    twitterImage: studioFirstPhoto.value,
     twitterCard: "summary",
   })
 
@@ -623,7 +616,7 @@ useSeoMeta({
   ogImage: () => {
     const photos = address?.value?.photos
     return photos && photos.length > 0
-        ? photos[0].url
+        ? photos[0].path
         : "/meta/open-graph-image.png"
   },
   ogUrl: route.fullPath,
@@ -633,7 +626,7 @@ useSeoMeta({
   twitterImage: () => {
     const photos = address?.value?.photos
     return photos && photos.length > 0
-        ? photos[0].url
+        ? photos[0].path
         : "/meta/open-graph-image.png"
   },
   twitterCard: "summary",
@@ -692,12 +685,40 @@ onMounted(async () => {
   }
 })
 
+// Define isOwner computed property before using it
+const isOwner = computed(() => session.user?.id === address.value?.company?.user_id)
+const selectedCustomerId = ref(null)
+const customers = ref([])
+
 // Watch for address to load and fetch customers if owner
 watch(() => address.value, (newAddress) => {
   if (newAddress && isOwner.value) {
     fetchCustomersForOwner()
   }
 }, { immediate: true })
+
+async function fetchCustomersForOwner() {
+  // Check if address is loaded
+  if (!address.value?.id) {
+    return
+  }
+
+  // Получаем всю историю сообщений для адреса (можно оптимизировать на бэкенде)
+  const { fetch } = useApi({
+    url: `/messages/history?address_id=${address.value.id}&user_id=${session.user?.id}`,
+    auth: true
+  })
+  const response = await fetch()
+  if (response?.data) {
+    // Собираем уникальные customer_id (sender_id, не равные owner)
+    const ids = new Set()
+    response.data.forEach(msg => {
+      if (msg.sender_id !== session.user?.id) ids.add(msg.sender_id)
+      if (msg.recipient_id !== session.user?.id) ids.add(msg.recipient_id)
+    })
+    customers.value = Array.from(ids)
+  }
+}
 
 onUnmounted(() => {
   window.removeEventListener("scroll", handleScroll)
@@ -712,22 +733,38 @@ function handlePaymentStatus(event: MessageEvent) {
 }
 
 async function getStartSlots() {
+  // Only fetch if both room_id and date are set
+  if (!rentingForm.value.room_id || !rentingForm.value.date) {
+    return
+  }
+
   const {fetch: fetchStartSlots} = useApi({
     url: `/address/reservation/start-time?room_id=${rentingForm.value.room_id}&date=${rentingForm.value.date}`,
   })
 
   fetchStartSlots().then((response) => {
-    hoursAvailableStart.value = response.data
+    hoursAvailableStart.value = response.available_times || []
+  }).catch((error) => {
+    console.error('Error fetching start slots:', error)
+    hoursAvailableStart.value = []
   })
 }
 
 async function getEndSlots(start_time: string) {
+  // Only fetch if room_id, date, and start_time are set
+  if (!rentingForm.value.room_id || !rentingForm.value.date || !start_time) {
+    return
+  }
+
   const {fetch: getEndSlots} = useApi({
     url: `/address/reservation/end-time?room_id=${rentingForm.value.room_id}&date=${rentingForm.value.date}&start_time=${start_time}`,
   })
 
   getEndSlots().then((response) => {
-    hoursAvailableEnd.value = response.data
+    hoursAvailableEnd.value = response.available_times || []
+  }).catch((error) => {
+    console.error('Error fetching end slots:', error)
+    hoursAvailableEnd.value = []
   })
 }
 
@@ -962,42 +999,11 @@ const studioId = ref(null)
 const studioOwnerId = ref(null)
 
 const openChatPopup = () => {
-  console.log('[chat][debug] Opening chat popup')
-  console.log('[chat][debug] isOwner:', isOwner.value)
-  console.log('[chat][debug] address?.company?.user_id:', address.value?.company?.user_id)
-  console.log('[chat][debug] selectedCustomerId:', selectedCustomerId.value)
   showChatPopup.value = true
 }
 
 const closeChatPopup = () => {
   showChatPopup.value = false
-}
-
-const isOwner = computed(() => session.user?.id === address.value?.company?.user_id)
-const selectedCustomerId = ref(null)
-const customers = ref([])
-
-async function fetchCustomersForOwner() {
-  // Check if address is loaded
-  if (!address.value?.id) {
-    return
-  }
-
-  // Получаем всю историю сообщений для адреса (можно оптимизировать на бэкенде)
-  const { fetch } = useApi({
-    url: `/messages/history?address_id=${address.value.id}&user_id=${session.user?.id}`,
-    auth: true
-  })
-  const response = await fetch()
-  if (response?.data) {
-    // Собираем уникальные customer_id (sender_id, не равные owner)
-    const ids = new Set()
-    response.data.forEach(msg => {
-      if (msg.sender_id !== session.user?.id) ids.add(msg.sender_id)
-      if (msg.recipient_id !== session.user?.id) ids.add(msg.recipient_id)
-    })
-    customers.value = Array.from(ids)
-  }
 }
 
 function openChatWithCustomer(customerId) {

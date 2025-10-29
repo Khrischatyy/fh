@@ -180,17 +180,15 @@ app.include_router(rooms_router, prefix=settings.api_prefix)
 from src.operating_hours.router import router as operating_hours_router
 app.include_router(operating_hours_router, prefix=settings.api_prefix)
 
+# Booking router
+from src.bookings.router import router as bookings_router
+app.include_router(bookings_router, prefix=settings.api_prefix)
+
 # TODO: Register additional routers as they are implemented
-# from src.users.router import router as users_router
-# from src.bookings.router import router as bookings_router
 # from src.payments.router import router as payments_router
 # from src.messages.router import router as messages_router
 # from src.teams.router import router as teams_router
 
-# app.include_router(users_router, prefix=settings.api_prefix)
-# app.include_router(companies_router, prefix=settings.api_prefix)
-# app.include_router(rooms_router, prefix=settings.api_prefix)
-# app.include_router(bookings_router, prefix=settings.api_prefix)
 # app.include_router(payments_router, prefix=settings.api_prefix)
 # app.include_router(messages_router, prefix=settings.api_prefix)
 # app.include_router(teams_router, prefix=settings.api_prefix)

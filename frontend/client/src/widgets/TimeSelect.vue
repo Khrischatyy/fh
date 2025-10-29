@@ -18,9 +18,8 @@ import FSelect, { type OptionType } from "../shared/ui/common/Input/FSelect.vue"
 import { isoToHumanReadable } from "../shared/utils"
 
 type AvailbleHourType = {
-  date: string
+  time: string
   iso_string: string
-  time?: string
 }
 
 const props = withDefaults(
@@ -44,7 +43,7 @@ const structuredHours = computed(() => {
   const hours = props.availableHours?.map((hour, index) => {
     return {
       id: index + 1,
-      label: hour.date,
+      label: hour.time,
       name: hour.iso_string,
     }
   })

@@ -54,17 +54,12 @@ class Booking(Base, IDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
-    address_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("addresses.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
     status_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("booking_statuses.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
+        default=1,
     )
 
     # Booking time details
@@ -80,9 +75,6 @@ class Booking(Base, IDMixin, TimestampMixin):
         nullable=True,
     )
 
-    # Additional info
-    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-
     # Relationships
     room: Mapped["Room"] = relationship(
         "Room",
@@ -90,10 +82,6 @@ class Booking(Base, IDMixin, TimestampMixin):
     )
     user: Mapped["User"] = relationship(
         "User",
-        back_populates="bookings",
-    )
-    address: Mapped["Address"] = relationship(
-        "Address",
         back_populates="bookings",
     )
     status: Mapped["BookingStatus"] = relationship(
