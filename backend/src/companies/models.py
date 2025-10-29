@@ -41,12 +41,12 @@ class Company(Base, IDMixin, TimestampMixin):
 
 
 class AdminCompany(Base, IDMixin, TimestampMixin):
-    """Join table between User and Company for company administrators."""
+    """Join table between User and Company for company administrators - matches Laravel schema."""
 
-    __tablename__ = "admin_companies"
+    __tablename__ = "admin_company"
 
     # Foreign keys
-    user_id: Mapped[int] = mapped_column(
+    admin_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
@@ -70,4 +70,4 @@ class AdminCompany(Base, IDMixin, TimestampMixin):
     )
 
     def __repr__(self) -> str:
-        return f"<AdminCompany(id={self.id}, user_id={self.user_id}, company_id={self.company_id})>"
+        return f"<AdminCompany(id={self.id}, admin_id={self.admin_id}, company_id={self.company_id})>"

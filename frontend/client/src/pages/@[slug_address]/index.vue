@@ -690,8 +690,14 @@ onMounted(async () => {
   if (address?.value?.rooms?.length > 0) {
     rentingForm.value.room_id = address?.value?.rooms[0].id
   }
-  if (isOwner.value) fetchCustomersForOwner()
 })
+
+// Watch for address to load and fetch customers if owner
+watch(() => address.value, (newAddress) => {
+  if (newAddress && isOwner.value) {
+    fetchCustomersForOwner()
+  }
+}, { immediate: true })
 
 onUnmounted(() => {
   window.removeEventListener("scroll", handleScroll)
@@ -967,17 +973,16 @@ const closeChatPopup = () => {
   showChatPopup.value = false
 }
 
-watchEffect(() => {
-  console.log('address:', address.value);
-  console.log('user_id:', address.value?.company?.user_id);
-  console.log('showChatPopup:', showChatPopup.value);
-});
-
 const isOwner = computed(() => session.user?.id === address.value?.company?.user_id)
 const selectedCustomerId = ref(null)
 const customers = ref([])
 
 async function fetchCustomersForOwner() {
+  // Check if address is loaded
+  if (!address.value?.id) {
+    return
+  }
+
   // Получаем всю историю сообщений для адреса (можно оптимизировать на бэкенде)
   const { fetch } = useApi({
     url: `/messages/history?address_id=${address.value.id}&user_id=${session.user?.id}`,

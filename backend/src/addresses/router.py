@@ -2,7 +2,7 @@
 Address router - API endpoint definitions.
 Handles HTTP requests and delegates to service layer.
 """
-from typing import Annotated
+from typing import Annotated, Any
 from fastapi import APIRouter, Depends, status
 
 from src.addresses.dependencies import get_address_service
@@ -19,9 +19,13 @@ from src.addresses.schemas import (
 from src.addresses.service import AddressService
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
+from src.geographic.schemas import LaravelResponse
 
 
 router = APIRouter(prefix="/addresses", tags=["Addresses"])
+
+# Laravel-compatible singular /address routes
+address_router = APIRouter(prefix="/address", tags=["Address"])
 
 
 @router.post(
@@ -268,3 +272,143 @@ async def add_badges(
     """
     badges = await service.add_badges(address_id, data.badge_ids)
     return [BadgeResponse.model_validate(badge) for badge in badges]
+
+
+# Laravel-compatible /address/studio/{slug} endpoint
+@address_router.get(
+    "/studio/{address_slug}",
+    status_code=status.HTTP_200_OK,
+)
+async def get_studio_by_slug(
+    address_slug: str,
+):
+    """
+    Retrieve a studio (address) by its slug with all related data.
+
+    Laravel compatible: GET /api/address/studio/{address_slug}
+
+    Returns:
+        Complete address with all relationships: badges, rooms, photos, prices,
+        company, operating hours, equipment
+
+    Raises:
+        NotFoundException: If address not found
+    """
+    from src.addresses.repository import AddressRepository
+    from src.database import AsyncSessionLocal
+    from src.exceptions import NotFoundException
+
+    async with AsyncSessionLocal() as session:
+        repository = AddressRepository(session)
+        address = await repository.find_by_slug_with_relations(address_slug)
+
+        if not address:
+            raise NotFoundException(f"Address with slug '{address_slug}' not found")
+
+        # Build address dict with all relationships
+        addr_dict = {
+            "id": address.id,
+            "slug": address.slug,
+            "street": address.street,
+            "latitude": str(address.latitude) if address.latitude else None,
+            "longitude": str(address.longitude) if address.longitude else None,
+            "timezone": address.timezone,
+            "rating": address.rating,
+            "city_id": address.city_id,
+            "company_id": address.company_id,
+            "available_balance": float(address.available_balance),
+            "created_at": address.created_at.isoformat(),
+            "updated_at": address.updated_at.isoformat(),
+            "badges": [{"id": b.id, "name": b.name, "image": b.image, "description": b.description} for b in address.badges],
+            "rooms": [
+                {
+                    "id": r.id,
+                    "name": r.name,
+                    "photos": [{"id": p.id, "path": p.path, "index": p.index} for p in r.photos],
+                    "prices": [
+                        {
+                            "id": pr.id,
+                            "hours": pr.hours,
+                            "total_price": float(pr.total_price),
+                            "price_per_hour": float(pr.price_per_hour),
+                            "is_enabled": pr.is_enabled
+                        }
+                        for pr in r.prices if pr.is_enabled  # Only enabled prices like Laravel
+                    ],
+                }
+                for r in address.rooms
+            ],
+            "operating_hours": [
+                {
+                    "id": oh.id,
+                    "day_of_week": oh.day_of_week,
+                    "open_time": oh.open_time.isoformat() if oh.open_time else None,
+                    "close_time": oh.close_time.isoformat() if oh.close_time else None,
+                    "is_closed": oh.is_closed,
+                    "mode_id": oh.mode_id,
+                }
+                for oh in address.operating_hours
+            ],
+            # Frontend expects "equipments" (plural)
+            "equipments": [],
+        }
+
+        # Add flattened prices and photos (matching Laravel getPricesAttribute and getPhotosAttribute)
+        all_prices = []
+        all_photos = []
+        for room in address.rooms:
+            # Only add enabled prices
+            all_prices.extend([
+                {
+                    "id": pr.id,
+                    "hours": pr.hours,
+                    "total_price": float(pr.total_price),
+                    "price_per_hour": float(pr.price_per_hour),
+                    "is_enabled": pr.is_enabled
+                }
+                for pr in room.prices if pr.is_enabled
+            ])
+            all_photos.extend([
+                {
+                    "id": p.id,
+                    "path": p.path,
+                    "index": p.index
+                }
+                for p in room.photos
+            ])
+
+        addr_dict["prices"] = all_prices
+        addr_dict["photos"] = all_photos
+
+        # Calculate is_complete (matching Laravel getIsCompleteAttribute)
+        has_operating_hours = len(address.operating_hours) > 0
+        has_stripe_gateway = False
+        has_square_gateway = False
+
+        if address.company and address.company.admin_companies:
+            for admin_comp in address.company.admin_companies:
+                if admin_comp.admin:
+                    has_stripe_gateway = admin_comp.admin.stripe_account_id is not None
+                    has_square_gateway = admin_comp.admin.payment_gateway == 'square'
+                    break
+
+        addr_dict["is_complete"] = has_operating_hours and (has_stripe_gateway or has_square_gateway)
+
+        # Add company info
+        if address.company:
+            addr_dict["company"] = {
+                "id": address.company.id,
+                "name": address.company.name,
+                "slug": address.company.slug,
+                "logo": address.company.logo,
+                # logo_url intentionally omitted - will be added when S3 integration is ready
+            }
+
+            # Add user_id from admin_company
+            if address.company.admin_companies:
+                for admin_comp in address.company.admin_companies:
+                    if admin_comp.admin:
+                        addr_dict["company"]["user_id"] = admin_comp.admin.id
+                        break
+
+        return addr_dict

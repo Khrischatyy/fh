@@ -51,6 +51,13 @@ class RegisterResponse(BaseModel):
     role: str
 
 
+class LoginResponse(BaseModel):
+    """Schema for login response - Laravel compatible."""
+    message: str
+    token: str
+    role: str
+
+
 class UserResponse(BaseModel):
     """Schema for user response (Laravel compatible)."""
     id: int

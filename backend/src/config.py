@@ -74,6 +74,9 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_tls: bool = True
 
+    # SendGrid (preferred for production)
+    sendgrid_api_key: str = ""
+
     # Redis
     redis_url: str = "redis://redis:6379/0"
 

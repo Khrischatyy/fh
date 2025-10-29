@@ -16,13 +16,12 @@ if TYPE_CHECKING:
 
 
 class Room(Base, IDMixin, TimestampMixin):
-    """Room model representing a bookable space within a studio."""
+    """Room model representing a bookable space within a studio - matches Laravel schema."""
 
     __tablename__ = "rooms"
 
     # Basic info
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Foreign keys
     address_id: Mapped[int] = mapped_column(
@@ -31,9 +30,6 @@ class Room(Base, IDMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
-
-    # Status
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # Relationships
     address: Mapped["Address"] = relationship(
@@ -61,8 +57,8 @@ class Room(Base, IDMixin, TimestampMixin):
         return f"<Room(id={self.id}, name={self.name}, address_id={self.address_id})>"
 
 
-class RoomPhoto(Base, IDMixin, TimestampMixin):
-    """Room photo with ordering support."""
+class RoomPhoto(Base, IDMixin):
+    """Room photo with ordering support - matches Laravel schema."""
 
     __tablename__ = "room_photos"
 
@@ -75,8 +71,8 @@ class RoomPhoto(Base, IDMixin, TimestampMixin):
     )
 
     # Photo info
-    photo_path: Mapped[str] = mapped_column(String(500), nullable=False)
-    index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # For ordering
+    path: Mapped[str] = mapped_column(String(500), nullable=False)
+    index: Mapped[int] = mapped_column("index", Integer, default=0, nullable=False)  # For ordering
 
     # Relationships
     room: Mapped["Room"] = relationship(
@@ -88,8 +84,8 @@ class RoomPhoto(Base, IDMixin, TimestampMixin):
         return f"<RoomPhoto(id={self.id}, room_id={self.room_id}, index={self.index})>"
 
 
-class RoomPrice(Base, IDMixin, TimestampMixin):
-    """Pricing tiers for room bookings based on duration."""
+class RoomPrice(Base, IDMixin):
+    """Pricing tiers for room bookings based on duration - matches Laravel schema."""
 
     __tablename__ = "room_prices"
 

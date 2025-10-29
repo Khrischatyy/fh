@@ -7,20 +7,19 @@ from sqlalchemy import String, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
-from src.models import IDMixin, TimestampMixin
+from src.models import IDMixin
 
 if TYPE_CHECKING:
     from src.addresses.models import Address
 
 
-class Country(Base, IDMixin, TimestampMixin):
-    """Country model for geographic location."""
+class Country(Base, IDMixin):
+    """Country model for geographic location - matches Laravel structure."""
 
     __tablename__ = "countries"
 
     # Basic info
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
-    code: Mapped[str] = mapped_column(String(10), nullable=False, unique=True, index=True)
 
     # Relationships
     cities: Mapped[list["City"]] = relationship(
@@ -30,11 +29,11 @@ class Country(Base, IDMixin, TimestampMixin):
     )
 
     def __repr__(self) -> str:
-        return f"<Country(id={self.id}, name={self.name}, code={self.code})>"
+        return f"<Country(id={self.id}, name={self.name})>"
 
 
-class City(Base, IDMixin, TimestampMixin):
-    """City model for geographic location."""
+class City(Base, IDMixin):
+    """City model for geographic location - matches Laravel structure."""
 
     __tablename__ = "cities"
 

@@ -2,7 +2,7 @@
 Authentication router with login, registration, and OAuth endpoints.
 """
 from datetime import timedelta
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, status, Query, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from authlib.integrations.starlette_client import OAuth
 import httpx
@@ -31,11 +31,17 @@ oauth.register(
 
 @router.post("/register", response_model=schemas.RegisterResponse, status_code=status.HTTP_200_OK)
 async def register(
-    user_data: schemas.UserRegister,
+    name: str = Form(..., max_length=255, description="User's full name"),
+    email: str = Form(..., max_length=255, description="User's email address"),
+    password: str = Form(..., min_length=8, max_length=100, description="User's password"),
+    password_confirmation: str = Form(..., min_length=8, max_length=100, description="Password confirmation"),
+    role: str = Form(..., max_length=15, pattern="^(user|studio_owner|admin)$", description="User role"),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Register a new user account - Laravel compatible endpoint.
+
+    Accepts form data (application/x-www-form-urlencoded) like Laravel Fortify.
 
     - **name**: User's full name (required, max 255 characters)
     - **email**: User's email address (required, must be unique, valid email format)
@@ -48,11 +54,52 @@ async def register(
     - **token**: Sanctum-compatible API token
     - **role**: Assigned user role
     """
+    from src.exceptions import ValidationException
+    import re
+
+    # Validate email format
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(email_pattern, email):
+        raise ValidationException(
+            message="The email must be a valid email address.",
+            errors={"email": ["The email must be a valid email address."]}
+        )
+
+    # Validate password length
+    if len(password) < 8:
+        raise ValidationException(
+            message="The password must be at least 8 characters.",
+            errors={"password": ["The password must be at least 8 characters."]}
+        )
+
+    # Validate password confirmation
+    if password != password_confirmation:
+        raise ValidationException(
+            message="The password confirmation does not match.",
+            errors={"password_confirmation": ["The password confirmation does not match."]}
+        )
+
+    # Validate role
+    if role not in ["user", "studio_owner", "admin"]:
+        raise ValidationException(
+            message="The selected role is invalid.",
+            errors={"role": ["The selected role is invalid."]}
+        )
+
+    # Create UserRegister schema for validation
+    user_data = schemas.UserRegister(
+        name=name,
+        email=email,
+        password=password,
+        password_confirmation=password_confirmation,
+        role=role,
+    )
+
     user = await auth_service.register_user(db, user_data)
 
     # Create access token (Sanctum-style format: {id}|{token})
     access_token_jwt = auth_service.create_access_token(
-        data={"sub": user.id},
+        data={"sub": str(user.id)},  # JWT spec requires sub to be a string
         expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
     )
 
@@ -66,31 +113,60 @@ async def register(
     )
 
 
-@router.post("/login", response_model=schemas.TokenResponse)
+@router.post("/login", response_model=schemas.LoginResponse)
 async def login(
-    credentials: schemas.UserLogin,
+    email: str = Form(..., description="User's email address"),
+    password: str = Form(..., description="User's password"),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Authenticate user and return access token.
+    Authenticate user and return access token - Laravel Fortify compatible endpoint.
+
+    Accepts form data (application/x-www-form-urlencoded) like Laravel Fortify.
 
     - **email**: User's email address
     - **password**: User's password
-    """
-    user = await auth_service.authenticate_user(db, credentials.email, credentials.password)
-    if not user:
-        raise UnauthorizedException("Incorrect email or password")
 
-    # Create access token
-    access_token = auth_service.create_access_token(
-        data={"sub": user.id},
+    Returns Laravel-style response with Sanctum token format.
+    """
+    from src.exceptions import ValidationException
+    import re
+
+    # Validate email format
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(email_pattern, email):
+        raise ValidationException(
+            message="The email must be a valid email address.",
+            errors={"email": ["The email must be a valid email address."]}
+        )
+
+    # Validate password length
+    if len(password) < 8:
+        raise ValidationException(
+            message="The password must be at least 8 characters.",
+            errors={"password": ["The password must be at least 8 characters."]}
+        )
+
+    user = await auth_service.authenticate_user(db, email, password)
+    if not user:
+        raise ValidationException(
+            message="These credentials do not match our records.",
+            errors={"email": ["These credentials do not match our records."]}
+        )
+
+    # Create access token (Sanctum-style format: {id}|{token})
+    access_token_jwt = auth_service.create_access_token(
+        data={"sub": str(user.id)},  # JWT spec requires sub to be a string
         expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
     )
 
-    return schemas.TokenResponse(
-        access_token=access_token,
-        token_type="bearer",
-        expires_in=settings.access_token_expire_minutes * 60,
+    # Format token like Laravel Sanctum: "{id}|{plainTextToken}"
+    sanctum_token = f"{user.id}|{access_token_jwt}"
+
+    return schemas.LoginResponse(
+        message="Login successful",
+        token=sanctum_token,
+        role=user.role,
     )
 
 

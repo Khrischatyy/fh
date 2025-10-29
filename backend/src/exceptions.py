@@ -57,10 +57,18 @@ class ConflictException(AppException):
 
 
 class ValidationException(AppException):
-    """Validation exception."""
+    """Validation exception with Laravel-compatible errors format."""
 
-    def __init__(self, detail: str = "Validation error"):
-        super().__init__(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail)
+    def __init__(
+        self,
+        message: str = "Validation error",
+        errors: dict[str, list[str]] | None = None,
+        detail: str | None = None,
+    ):
+        # Use message as detail for compatibility with parent class
+        super().__init__(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=message)
+        self.message = message
+        self.errors = errors or {}
 
 
 class PaymentException(AppException):
@@ -82,6 +90,16 @@ class BookingException(AppException):
 
 async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
     """Handle application-specific exceptions."""
+    # Special handling for ValidationException to include errors field
+    if isinstance(exc, ValidationException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "message": exc.message,
+                "errors": exc.errors,
+            },
+        )
+
     return JSONResponse(
         status_code=exc.status_code,
         content={

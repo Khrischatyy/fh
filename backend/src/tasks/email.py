@@ -10,6 +10,9 @@ from email.mime.multipart import MIMEMultipart
 from jinja2 import Environment, FileSystemLoader
 import asyncio
 
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Content, Email, To
+
 from src.config import settings
 
 
@@ -17,13 +20,49 @@ from src.config import settings
 template_env = Environment(loader=FileSystemLoader("templates"))
 
 
-async def send_email_async(
+def send_email_sendgrid(
     to_email: str,
     subject: str,
     html_content: str,
     text_content: str = None,
 ) -> bool:
-    """Send email using aiosmtplib."""
+    """Send email using SendGrid API."""
+    try:
+        # Create SendGrid message
+        message = Mail(
+            from_email=Email(settings.mail_from_address, settings.mail_from_name),
+            to_emails=To(to_email),
+            subject=subject,
+            html_content=Content("text/html", html_content)
+        )
+
+        # Add plain text content if provided
+        if text_content:
+            message.add_content(Content("text/plain", text_content))
+
+        # Send email
+        sg = SendGridAPIClient(settings.sendgrid_api_key)
+        response = sg.send(message)
+
+        # Check response
+        if response.status_code >= 200 and response.status_code < 300:
+            return True
+        else:
+            print(f"SendGrid error: {response.status_code} - {response.body}")
+            return False
+
+    except Exception as e:
+        print(f"Error sending email via SendGrid: {e}")
+        return False
+
+
+async def send_email_smtp(
+    to_email: str,
+    subject: str,
+    html_content: str,
+    text_content: str = None,
+) -> bool:
+    """Send email using SMTP (fallback for local development)."""
     try:
         message = MIMEMultipart("alternative")
         message["From"] = f"{settings.mail_from_name} <{settings.mail_from_address}>"
@@ -51,13 +90,21 @@ async def send_email_async(
 
         return True
     except Exception as e:
-        print(f"Error sending email: {e}")
+        print(f"Error sending email via SMTP: {e}")
         return False
 
 
 def send_email_sync(to_email: str, subject: str, html_content: str, text_content: str = None):
-    """Synchronous wrapper for sending email."""
-    return asyncio.run(send_email_async(to_email, subject, html_content, text_content))
+    """
+    Synchronous wrapper for sending email.
+    Uses SendGrid if API key is configured, otherwise falls back to SMTP.
+    """
+    # Use SendGrid if API key is configured
+    if settings.sendgrid_api_key:
+        return send_email_sendgrid(to_email, subject, html_content, text_content)
+    else:
+        # Fallback to SMTP (Mailtrap for local development)
+        return asyncio.run(send_email_smtp(to_email, subject, html_content, text_content))
 
 
 @shared_task(name="send_verification_email")

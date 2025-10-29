@@ -49,32 +49,33 @@ address_badge = Table(
 
 
 class Address(Base, IDMixin, TimestampMixin):
-    """Address model representing a studio location."""
+    """Address model representing a studio location - matches Laravel database schema."""
 
     __tablename__ = "addresses"
 
     # Basic info
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Location
-    street: Mapped[str] = mapped_column(String(500), nullable=False)
-    latitude: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 8), nullable=True)
-    longitude: Mapped[Optional[Decimal]] = mapped_column(Numeric(11, 8), nullable=True)
+    street: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    latitude: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 6), nullable=True)
+    longitude: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 6), nullable=True)
     timezone: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
+    # Rating
+    rating: Mapped[Optional[float]] = mapped_column(nullable=True)
+
     # Foreign keys
-    city_id: Mapped[int] = mapped_column(
+    city_id: Mapped[Optional[int]] = mapped_column(
         Integer,
         ForeignKey("cities.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
-    company_id: Mapped[int] = mapped_column(
+    company_id: Mapped[Optional[int]] = mapped_column(
         Integer,
         ForeignKey("companies.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
 
@@ -84,13 +85,6 @@ class Address(Base, IDMixin, TimestampMixin):
         default=Decimal("0.00"),
         nullable=False,
     )
-
-    # Media
-    cover_photo: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-
-    # Status
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    is_published: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Relationships
     city: Mapped["City"] = relationship(
@@ -151,28 +145,29 @@ class Address(Base, IDMixin, TimestampMixin):
         return f"<Address(id={self.id}, name={self.name}, slug={self.slug})>"
 
 
-class OperatingHour(Base, IDMixin, TimestampMixin):
-    """Operating hours for a studio."""
+class OperatingHour(Base, IDMixin):
+    """Operating hours for a studio - matches Laravel database schema."""
 
     __tablename__ = "operating_hours"
 
     # Foreign keys
     address_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey("addresses.id", ondelete="CASCADE"),
+        ForeignKey("addresses.id"),
         nullable=False,
         index=True,
     )
+    mode_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("operating_modes.id"),
+        nullable=True,
+    )
 
     # Schedule
-    day_of_week: Mapped[int] = mapped_column(Integer, nullable=False)  # 0=Monday, 6=Sunday
-    start_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)
-    end_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)
-    operation_mode: Mapped[OperationMode] = mapped_column(
-        SQLEnum(OperationMode, name="operation_mode_enum"),
-        default=OperationMode.OPEN,
-        nullable=False,
-    )
+    day_of_week: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 0=Monday, 6=Sunday
+    open_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)
+    close_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)
+    is_closed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Relationships
     address: Mapped["Address"] = relationship(
@@ -262,14 +257,15 @@ class Equipment(Base, IDMixin, TimestampMixin):
         return f"<Equipment(id={self.id}, name={self.name})>"
 
 
-class Badge(Base, IDMixin, TimestampMixin):
-    """Badge/amenity tags for studios (e.g., WiFi, Parking, etc.)."""
+class Badge(Base, IDMixin):
+    """Badge/amenity tags for studios (e.g., WiFi, Parking, etc.) - matches Laravel schema."""
 
     __tablename__ = "badges"
 
     # Basic info
-    name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
-    icon: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # Icon name or path
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    image: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships
     addresses: Mapped[list["Address"]] = relationship(

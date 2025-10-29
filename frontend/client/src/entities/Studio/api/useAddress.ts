@@ -1,4 +1,5 @@
 import type { Ref } from "vue"
+import { watch } from "vue"
 import { useApi } from "~/src/lib/api"
 import { useAsyncData } from "#app"
 import type { RouteParamValue } from "vue-router"
@@ -74,22 +75,25 @@ export function useAddress(slug: string | RouteParamValue[]) {
     auth: true,
   })
 
-  console.log("getBrand", resolvedSlug)
   //useAsyncData helps to serve it server-side
   const {
     data: address,
     pending,
     error,
-  } = useAsyncData<AddressFull>("address", async () => {
+  } = useAsyncData<AddressFull>(`address-${resolvedSlug}`, async () => {
     const response = await getBrand()
 
-    return response.data // Assuming 'data' contains the desired AddressFull object
+    // The response IS the address object itself (already unwrapped by useApi)
+    return response
   })
 
-  if (error.value) {
-    if (error.value.statusCode == 404) navigateTo("/404")
-    else navigateTo("/")
-  }
+  // Watch for errors and handle them
+  watch(error, (newError) => {
+    if (newError) {
+      if (newError.statusCode == 404) navigateTo("/404")
+      else navigateTo("/")
+    }
+  })
 
   return { address, pending, error }
 }

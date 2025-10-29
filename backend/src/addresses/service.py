@@ -23,27 +23,22 @@ class AddressService:
         Create a new address with validation and slug generation.
 
         Applies business rules:
-        - Generates unique slug from name
+        - Generates unique slug
         - Ensures slug uniqueness
         - Initializes default values
         """
-        slug = self._generate_slug(data.name)
+        slug = data.slug if hasattr(data, 'slug') else f"address-{data.city_id}-{data.company_id}"
         slug = await self._ensure_unique_slug(slug)
 
         address = Address(
-            name=data.name,
             slug=slug,
-            description=data.description,
-            street=data.street,
-            latitude=data.latitude,
-            longitude=data.longitude,
-            timezone=data.timezone or "UTC",
-            city_id=data.city_id,
-            company_id=data.company_id,
-            cover_photo=data.cover_photo,
+            street=data.street if hasattr(data, 'street') else None,
+            latitude=data.latitude if hasattr(data, 'latitude') else None,
+            longitude=data.longitude if hasattr(data, 'longitude') else None,
+            timezone=data.timezone if hasattr(data, 'timezone') else None,
+            city_id=data.city_id if hasattr(data, 'city_id') else None,
+            company_id=data.company_id if hasattr(data, 'company_id') else None,
             available_balance=Decimal("0.00"),
-            is_active=True,
-            is_published=False,
         )
 
         return await self._repository.create(address)
@@ -203,3 +198,35 @@ class AddressService:
 
         await self._repository.update(address)
         return address.badges
+
+    async def get_addresses_by_city(self, city_id: int) -> list[Address]:
+        """
+        Get all complete addresses for a specific city.
+
+        Matches Laravel: getAddressByCityIdWithWorkingHours
+        Filters only complete addresses (has operating hours + payment gateway configured).
+        """
+        addresses = await self._repository.find_by_city(city_id)
+
+        # Filter only complete addresses
+        complete_addresses = []
+        for address in addresses:
+            # Check if address is complete:
+            # 1. Has operating hours
+            has_operating_hours = len(address.operating_hours) > 0
+
+            # 2. User has payment gateway configured (stripe or square)
+            has_payment_gateway = False
+            if address.company and address.company.admin_companies:
+                for admin_company in address.company.admin_companies:
+                    if admin_company.admin:  # Note: relationship is 'admin' not 'user'
+                        user = admin_company.admin
+                        has_stripe = user.stripe_account_id is not None
+                        has_square = user.payment_gateway == 'square'
+                        has_payment_gateway = has_stripe or has_square
+                        break
+
+            if has_operating_hours and has_payment_gateway:
+                complete_addresses.append(address)
+
+        return complete_addresses
