@@ -768,7 +768,7 @@ async function getEndSlots(start_time: string) {
   })
 }
 
-const calculatedPrice = ref(0)
+const calculatedPrice = ref({ total_price: 0, explanation: "" })
 
 const chooseRoom = (roomId: string) => {
   rentingForm.value.room_id = roomId
@@ -789,17 +789,28 @@ const calculatePrice = () => {
     auth: true,
   })
 
-  getPrice({
+  // Prepare request data, ensuring engineer_id is either a valid integer or null
+  const requestData = {
     room_id: rentingForm.value.room_id,
-    engineer_id: rentingForm.value.engineer_id,
+    engineer_id: rentingForm.value.engineer_id ? parseInt(rentingForm.value.engineer_id) : null,
     start_time:
         rentingForm.value.start_time.date +
         "T" +
         rentingForm.value.start_time.time,
     end_time:
         rentingForm.value.end_time.date + "T" + rentingForm.value.end_time.time,
-  }).then((response) => {
-    calculatedPrice.value = response.data
+  }
+
+  getPrice(requestData)
+  .then((response) => {
+    calculatedPrice.value = {
+      total_price: response.total_price || 0,
+      explanation: response.explanation || ""
+    }
+  })
+  .catch((error) => {
+    console.error('Error calculating price:', error)
+    calculatedPrice.value = { total_price: 0, explanation: "" }
   })
 }
 
@@ -807,7 +818,7 @@ watch(
     () => rentingForm.value.start_time,
     (newVal) => {
       if (newVal && rentingForm.value.end_time) {
-        calculatedPrice.value = 0
+        calculatedPrice.value = { total_price: 0, explanation: "" }
         rentingForm.value.end_time = {
           time: "",
           date: "",
@@ -827,7 +838,7 @@ watch(
     () => rentingForm.value.date,
     (newVal) => {
       if (newVal) {
-        calculatedPrice.value = 0
+        calculatedPrice.value = { total_price: 0, explanation: "" }
         rentingForm.value.end_time = {
           time: "",
           date: "",
@@ -848,7 +859,7 @@ watch(
           time: "",
           date: "",
         }
-        calculatedPrice.value = 0
+        calculatedPrice.value = { total_price: 0, explanation: "" }
 
       }
     },

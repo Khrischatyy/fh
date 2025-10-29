@@ -3,11 +3,15 @@ Booking router - API endpoints for room reservations.
 """
 from typing import Annotated
 from datetime import date as date_type, time as time_type
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Body, status
 
 from src.bookings.dependencies import get_booking_service
 from src.bookings.service import BookingService
-from src.bookings.schemas import AvailableTimesResponse
+from src.bookings.schemas import (
+    AvailableTimesResponse,
+    CalculatePriceRequest,
+    CalculatePriceResponse
+)
 
 
 router = APIRouter(tags=["Bookings"])
@@ -85,3 +89,47 @@ async def get_available_end_times(
     )
 
     return AvailableTimesResponse(available_times=available_times)
+
+
+@router.post(
+    "/address/calculate-price",
+    response_model=CalculatePriceResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Calculate total booking price",
+    description="Calculate the total price for a booking based on duration and optional engineer."
+)
+async def calculate_booking_price(
+    request: Annotated[CalculatePriceRequest, Body()],
+    service: Annotated[BookingService, Depends(get_booking_service)],
+) -> CalculatePriceResponse:
+    """
+    Calculate total booking price based on room, time range, and optional engineer.
+
+    **Request Body:**
+    - **room_id**: ID of the room to book
+    - **start_time**: Start time in ISO format (YYYY-MM-DDTHH:MM)
+    - **end_time**: End time in ISO format (YYYY-MM-DDTHH:MM)
+    - **engineer_id** (optional): Engineer ID to include engineer rate
+
+    **Returns:**
+    - **total_price**: Total cost for the booking
+    - **explanation**: Detailed breakdown of price calculation
+
+    **Business Rules:**
+    - Calculates hours between start and end time
+    - Finds applicable pricing tier based on duration
+    - If no exact tier matches, uses highest tier available
+    - Adds engineer hourly rate if engineer is selected
+    - Price = (hours × room_rate) + (hours × engineer_rate)
+    """
+    result = await service.calculate_total_cost(
+        start_time_str=request.start_time,
+        end_time_str=request.end_time,
+        room_id=request.room_id,
+        engineer_id=request.engineer_id
+    )
+
+    return CalculatePriceResponse(
+        total_price=result["total_price"],
+        explanation=result["explanation"]
+    )

@@ -2,7 +2,7 @@
 Booking service - Business logic for booking operations.
 """
 from datetime import date as date_type, time as time_type, datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict
 import pytz
 
 from src.bookings.repository import BookingRepository
@@ -308,3 +308,75 @@ class BookingService:
             current_dt += timedelta(hours=1)
 
         return available_times
+
+    async def calculate_total_cost(
+        self,
+        start_time_str: str,
+        end_time_str: str,
+        room_id: int,
+        engineer_id: Optional[int] = None
+    ) -> Dict[str, any]:
+        """
+        Calculate total booking cost based on duration and pricing tiers.
+
+        Args:
+            start_time_str: Start time in ISO format (e.g., "2025-10-31T10:00")
+            end_time_str: End time in ISO format
+            room_id: Room ID
+            engineer_id: Optional engineer ID to add engineer rate
+
+        Returns:
+            Dictionary with total_price and explanation
+        """
+        # Parse datetime strings
+        start_dt = datetime.fromisoformat(start_time_str)
+        end_dt = datetime.fromisoformat(end_time_str)
+
+        # Calculate total hours
+        time_diff = end_dt - start_dt
+        total_hours = int(time_diff.total_seconds() / 3600)
+
+        if total_hours <= 0:
+            raise BadRequestException("End time must be after start time")
+
+        # Get room prices
+        prices = await self._repository.get_room_prices(room_id)
+
+        if not prices:
+            raise BadRequestException("Prices were not set for this room")
+
+        # Find applicable price tier
+        # Prices are ordered by hours DESC, so we find first where hours <= total_hours
+        applicable_price = None
+        for price in prices:
+            if price.hours <= total_hours:
+                applicable_price = price
+                break
+
+        # If no tier matches (booking is shorter than smallest tier), use highest tier
+        if not applicable_price:
+            applicable_price = prices[0]
+
+        # Calculate base price
+        total_price = float(total_hours * applicable_price.price_per_hour)
+        explanation = (
+            f"The price is based on {total_hours} hours at a rate of "
+            f"{applicable_price.price_per_hour} per hour, using the package for "
+            f"{applicable_price.hours} hours."
+        )
+
+        # Add engineer rate if selected
+        if engineer_id:
+            engineer_rate = await self._repository.get_engineer_rate(engineer_id)
+            if engineer_rate:
+                engineer_cost = float(total_hours * engineer_rate)
+                total_price += engineer_cost
+                explanation += (
+                    f" An engineer was selected, adding {engineer_rate} per hour "
+                    f"for a total of {engineer_cost}."
+                )
+
+        return {
+            "total_price": total_price,
+            "explanation": explanation
+        }

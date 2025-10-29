@@ -3,12 +3,13 @@ Booking repository - Database access layer for bookings.
 """
 from datetime import date as date_type, time as time_type
 from typing import Optional
-from sqlalchemy import select, and_, or_
+from decimal import Decimal
+from sqlalchemy import select, and_, or_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.bookings.models import Booking, BookingStatus
-from src.rooms.models import Room
+from src.rooms.models import Room, RoomPrice
 from src.addresses.models import Address, OperatingHour
 
 
@@ -146,3 +147,31 @@ class BookingRepository:
         """Delete a booking."""
         await self._session.delete(booking)
         await self._session.flush()
+
+    async def get_room_prices(self, room_id: int) -> list[RoomPrice]:
+        """
+        Get all enabled room prices for a room, ordered by hours descending.
+        Used for price calculation.
+        """
+        stmt = (
+            select(RoomPrice)
+            .where(
+                and_(
+                    RoomPrice.room_id == room_id,
+                    RoomPrice.is_enabled == True
+                )
+            )
+            .order_by(RoomPrice.hours.desc())
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_engineer_rate(self, engineer_id: int) -> Optional[Decimal]:
+        """
+        Get engineer's hourly rate.
+        Returns None if no rate is set for the engineer.
+        """
+        stmt = text("SELECT rate_per_hour FROM engineer_rates WHERE user_id = :engineer_id")
+        result = await self._session.execute(stmt, {"engineer_id": engineer_id})
+        row = result.fetchone()
+        return row[0] if row else None

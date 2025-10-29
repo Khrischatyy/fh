@@ -71,3 +71,17 @@ class BookingResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CalculatePriceRequest(BaseModel):
+    """Calculate price request."""
+    room_id: int = Field(..., gt=0, description="Room ID")
+    start_time: str = Field(..., description="Start time in ISO format (YYYY-MM-DDTHH:MM)")
+    end_time: str = Field(..., description="End time in ISO format (YYYY-MM-DDTHH:MM)")
+    engineer_id: Optional[int] = Field(None, gt=0, description="Engineer ID (optional)")
+
+
+class CalculatePriceResponse(BaseModel):
+    """Calculate price response."""
+    total_price: float = Field(..., description="Total price for the booking")
+    explanation: str = Field(..., description="Explanation of price calculation")
