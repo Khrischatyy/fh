@@ -97,6 +97,15 @@ async def register(
 
     user = await auth_service.register_user(db, user_data)
 
+    # Send verification email (queued via Celery)
+    from src.tasks.email import send_verification_email
+    send_verification_email.delay(
+        user_id=user.id,
+        email=user.email,
+        firstname=user.firstname,
+        lastname=user.lastname
+    )
+
     # Create access token (Sanctum-style format: {id}|{token})
     access_token_jwt = auth_service.create_access_token(
         data={"sub": str(user.id)},  # JWT spec requires sub to be a string
@@ -189,14 +198,35 @@ async def verify_email_with_hash(
 ):
     """
     Verify user email using Laravel-style id/hash verification.
+    Sends welcome email based on user role after verification.
 
     - **id**: User ID
     - **hash**: SHA1 hash of user's email
     """
-    success = await auth_service.verify_email_by_hash(db, id, hash)
+    user = await auth_service.verify_email_by_hash(db, id, hash)
 
-    if not success:
+    if not user:
         raise NotFoundException("Invalid verification link")
+
+    # Send welcome email based on role (queued via Celery)
+    from src.tasks.email import send_welcome_email, send_welcome_email_owner
+
+    if user.role == "studio_owner":
+        # Generate password reset token for owner to set password
+        reset_token = await auth_service.create_password_reset_token(db, user.email)
+        send_welcome_email_owner.delay(
+            email=user.email,
+            firstname=user.firstname,
+            lastname=user.lastname,
+            reset_token=reset_token
+        )
+    else:
+        # Regular user welcome email
+        send_welcome_email.delay(
+            email=user.email,
+            firstname=user.firstname,
+            lastname=user.lastname
+        )
 
     return {"message": "Email successfully verified."}
 
@@ -208,6 +238,7 @@ async def forgot_password(
 ):
     """
     Request password reset link (Laravel compatible).
+    Sends ResetPasswordMail to user.
 
     - **email**: User's email address
     """
@@ -216,9 +247,12 @@ async def forgot_password(
         # Generate and store reset token
         reset_token = await auth_service.create_password_reset_token(db, user.email)
 
-        # TODO: Send password reset email with token
-        # reset_url = f"{settings.frontend_url}/reset-password?token={reset_token}&email={user.email}"
-        # await send_password_reset_email(user.email, reset_url)
+        # Send password reset email (queued via Celery)
+        from src.tasks.email import send_password_reset_email
+        send_password_reset_email.delay(
+            email=user.email,
+            token=reset_token
+        )
 
     # Always return success to prevent email enumeration (Laravel behavior)
     return {"message": "We have emailed your password reset link!"}
@@ -367,11 +401,14 @@ async def resend_verification(
     if current_user.email_verified_at:
         raise BadRequestException("Email is already verified")
 
-    # Generate verification URL
-    # verification_url = f"{settings.frontend_url}/email/verify/{current_user.id}/{hashlib.sha1(current_user.email.encode()).hexdigest()}"
-
-    # TODO: Send verification email
-    # await send_verification_email(current_user.email, verification_url)
+    # Send verification email (queued via Celery)
+    from src.tasks.email import send_verification_email
+    send_verification_email.delay(
+        user_id=current_user.id,
+        email=current_user.email,
+        firstname=current_user.firstname,
+        lastname=current_user.lastname
+    )
 
     return {"message": "A fresh verification link has been sent to your email address."}
 

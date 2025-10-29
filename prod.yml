@@ -55,7 +55,7 @@ services:
     expose:
       - "8000"
     env_file:
-      - ./backend/.env
+      - ./.env
     environment:
       - APP_ENV=production
       - DEBUG=false
@@ -129,7 +129,7 @@ services:
     container_name: funny-how-celery-worker-prod
     command: celery -A src.tasks.celery_app worker --loglevel=info --concurrency=4 --max-tasks-per-child=100
     env_file:
-      - ./backend/.env
+      - ./.env
     environment:
       - APP_ENV=production
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}

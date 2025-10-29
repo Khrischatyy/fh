@@ -59,7 +59,7 @@ services:
     expose:
       - "8000"
     env_file:
-      - ./backend/.env
+      - ./.env
     environment:
       - APP_ENV=development
       - DEBUG=true
@@ -121,7 +121,7 @@ services:
     volumes:
       - ./backend:/app
     env_file:
-      - ./backend/.env
+      - ./.env
     environment:
       - APP_ENV=development
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/book_studio

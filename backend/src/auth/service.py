@@ -264,25 +264,25 @@ class AuthService:
             await db.delete(token)
             await db.commit()
 
-    async def verify_email_by_hash(self, db: AsyncSession, user_id: int, hash: str) -> bool:
-        """Verify email using Laravel-style id/hash verification."""
+    async def verify_email_by_hash(self, db: AsyncSession, user_id: int, hash: str) -> Optional[User]:
+        """Verify email using Laravel-style id/hash verification. Returns user on success."""
         user = await self.get_user_by_id(db, user_id)
         if not user:
-            return False
+            return None
 
         # Generate hash from email (Laravel uses sha1)
         expected_hash = hashlib.sha1(user.email.encode()).hexdigest()
 
         # Compare hashes
         if expected_hash != hash:
-            return False
+            return None
 
         # Mark email as verified
         user.email_verified_at = datetime.utcnow()
         await db.commit()
         await db.refresh(user)
 
-        return True
+        return user
 
     async def update_profile_information(
         self,

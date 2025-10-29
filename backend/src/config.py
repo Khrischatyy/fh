@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file="../.env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore"
@@ -65,17 +65,14 @@ class Settings(BaseSettings):
     aws_region: str = "us-east-1"
     aws_bucket_name: str = ""
 
-    # Email
+    # Email - SendGrid Only
     mail_from_address: str = "mail@funny-how.com"
     mail_from_name: str = "Funny How"
-    smtp_host: str = "smtp.mailtrap.io"
-    smtp_port: int = 2525
-    smtp_username: str = ""
-    smtp_password: str = ""
-    smtp_tls: bool = True
-
-    # SendGrid (preferred for production)
     sendgrid_api_key: str = ""
+
+    # Frontend URLs for emails
+    frontend_url: str = "https://funny-how.com"
+    unsubscribe_url: str = "https://funny-how.com/unsubscribe"
 
     # Redis
     redis_url: str = "redis://redis:6379/0"
@@ -99,6 +96,7 @@ class Settings(BaseSettings):
     # Google APIs
     google_places_api_key: str = ""
     google_maps_api_key: str = ""
+    google_maps_api: str = ""  # Alternative key name for compatibility
 
     # Sentry (optional)
     sentry_dsn: Optional[str] = None
