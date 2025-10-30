@@ -6,13 +6,13 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database import get_async_session
+from src.database import get_db
 from src.addresses.repository import AddressRepository
 from src.addresses.service import AddressService
 
 
 async def get_address_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)]
+    session: Annotated[AsyncSession, Depends(get_db)]
 ) -> AddressRepository:
     """Provide AddressRepository instance with database session."""
     return AddressRepository(session)

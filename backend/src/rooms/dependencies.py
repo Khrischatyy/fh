@@ -5,13 +5,13 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database import get_async_session
+from src.database import get_db
 from src.rooms.repository import RoomRepository
 from src.rooms.service import RoomService
 
 
 async def get_room_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)]
+    session: Annotated[AsyncSession, Depends(get_db)]
 ) -> RoomRepository:
     """Provide RoomRepository instance."""
     return RoomRepository(session)

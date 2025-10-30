@@ -54,7 +54,7 @@ class CompanyRepository:
         stmt = (
             select(Company)
             .join(AdminCompany)
-            .where(AdminCompany.user_id == user_id)
+            .where(AdminCompany.admin_id == user_id)
             .options(selectinload(Company.addresses))
             .order_by(Company.created_at.desc())
         )
@@ -84,7 +84,7 @@ class CompanyRepository:
         """Add user as company admin."""
         admin_company = AdminCompany(
             company_id=company_id,
-            user_id=user_id,
+            admin_id=user_id,
         )
         self._session.add(admin_company)
         await self._session.flush()
@@ -95,7 +95,7 @@ class CompanyRepository:
         """Remove user as company admin."""
         stmt = select(AdminCompany).where(
             AdminCompany.company_id == company_id,
-            AdminCompany.user_id == user_id,
+            AdminCompany.admin_id == user_id,
         )
         result = await self._session.execute(stmt)
         admin_company = result.scalar_one_or_none()
@@ -107,7 +107,7 @@ class CompanyRepository:
         """Check if user is company admin."""
         stmt = select(AdminCompany.id).where(
             AdminCompany.company_id == company_id,
-            AdminCompany.user_id == user_id,
+            AdminCompany.admin_id == user_id,
         )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none() is not None

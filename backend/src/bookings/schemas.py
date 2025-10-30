@@ -85,3 +85,41 @@ class CalculatePriceResponse(BaseModel):
     """Calculate price response."""
     total_price: float = Field(..., description="Total price for the booking")
     explanation: str = Field(..., description="Explanation of price calculation")
+
+
+class CreateReservationRequest(BaseModel):
+    """Create reservation request."""
+    addressSlug: str = Field(..., description="Address slug for validation")
+    room_id: int = Field(..., gt=0, description="Room ID")
+    engineer_id: Optional[int] = Field(None, gt=0, description="Engineer ID (optional)")
+    date: date_type = Field(..., description="Booking start date (YYYY-MM-DD)")
+    start_time: str = Field(..., description="Start time (HH:MM)")
+    end_time: str = Field(..., description="End time (HH:MM)")
+    end_date: date_type = Field(..., description="Booking end date (YYYY-MM-DD)")
+
+    @field_validator('engineer_id', mode='before')
+    @classmethod
+    def validate_engineer_id(cls, v):
+        """Convert empty string to None."""
+        if v == "" or v is None:
+            return None
+        return int(v)
+
+    @field_validator('date', 'end_date')
+    @classmethod
+    def validate_dates(cls, v: date_type) -> date_type:
+        """Validate dates are not in the past."""
+        if v < datetime.now().date():
+            raise ValueError("Date cannot be in the past")
+        return v
+
+
+class CreateReservationResponse(BaseModel):
+    """Create reservation response."""
+    message: str = Field(..., description="Success message")
+    booking_id: int = Field(..., description="Created booking ID")
+    status: str = Field(..., description="Booking status")
+    payment_url: str = Field(..., description="Stripe payment URL")
+    session_id: str = Field(..., description="Payment session ID")
+    total_price: float = Field(..., description="Total booking price")
+    expires_at: str = Field(..., description="Payment link expiration time")

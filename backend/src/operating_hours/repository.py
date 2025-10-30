@@ -7,7 +7,7 @@ from datetime import date
 from sqlalchemy import select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.addresses.models import OperatingHour, StudioClosure, Address
+from src.addresses.models import OperatingHour, StudioClosure, Address, OperatingMode
 
 
 class OperatingHoursRepository:
@@ -163,3 +163,11 @@ class OperatingHoursRepository:
         stmt = select(Address.id).where(Address.id == address_id)
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none() is not None
+
+    # Operating Mode operations
+
+    async def get_all_operating_modes(self) -> list[OperatingMode]:
+        """Retrieve all operating modes."""
+        stmt = select(OperatingMode).order_by(OperatingMode.id)
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())

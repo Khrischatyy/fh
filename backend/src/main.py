@@ -26,7 +26,7 @@ from src.exceptions import (
 from src.auth.models import User, UserRole  # noqa: F401
 from src.geographic.models import Country, City  # noqa: F401
 from src.companies.models import Company, AdminCompany  # noqa: F401
-from src.addresses.models import Address, OperatingHour, StudioClosure, Equipment, EquipmentType, Badge  # noqa: F401
+from src.addresses.models import Address, OperatingMode, OperatingHour, StudioClosure, Equipment, EquipmentType, Badge  # noqa: F401
 from src.rooms.models import Room  # noqa: F401
 from src.bookings.models import Booking  # noqa: F401
 from src.messages.models import Message  # noqa: F401
@@ -152,6 +152,45 @@ async def root():
     }
 
 
+# Laravel-compatible operation-modes endpoint
+@app.get(f"{settings.api_prefix}/operation-modes", tags=["Operating Hours"])
+async def get_operation_modes():
+    """
+    Get all operation modes (Laravel-compatible endpoint).
+
+    Returns all available operating modes: 24/7, Fixed Hours, Variable Hours.
+    """
+    from src.operating_hours.dependencies import get_operating_hours_service
+    from src.operating_hours.schemas import OperatingModeResponse
+
+    # Get service instance
+    from src.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as session:
+        from src.operating_hours.repository import OperatingHoursRepository
+        from src.operating_hours.service import OperatingHoursService
+
+        repository = OperatingHoursRepository(session)
+        service = OperatingHoursService(repository)
+
+        modes = await service.get_all_operating_modes()
+
+        # Format modes for frontend (add description field from description_registration)
+        formatted_modes = []
+        for mode in modes:
+            mode_dict = OperatingModeResponse.model_validate(mode).model_dump()
+            # Add description field that frontend expects
+            mode_dict["description"] = mode_dict.get("description_registration", "")
+            formatted_modes.append(mode_dict)
+
+        # Return Laravel-compatible format with data wrapper
+        return {
+            "success": True,
+            "data": formatted_modes,
+            "message": "Operating modes retrieved successfully",
+            "code": 200
+        }
+
+
 # Register routers
 app.include_router(auth_router, prefix=settings.api_prefix)
 
@@ -169,12 +208,14 @@ from src.geographic.router import router as geographic_router
 app.include_router(geographic_router, prefix=settings.api_prefix)
 
 # Company router
-from src.companies.router import router as companies_router
+from src.companies.router import router as companies_router, brand_router
 app.include_router(companies_router, prefix=settings.api_prefix)
+app.include_router(brand_router, prefix=settings.api_prefix)  # Brand creation (POST /api/brand)
 
 # Room router
-from src.rooms.router import router as rooms_router
+from src.rooms.router import router as rooms_router, room_router
 app.include_router(rooms_router, prefix=settings.api_prefix)
+app.include_router(room_router, prefix=settings.api_prefix)  # Laravel-compatible singular /room routes
 
 # Operating Hours router
 from src.operating_hours.router import router as operating_hours_router
@@ -184,12 +225,18 @@ app.include_router(operating_hours_router, prefix=settings.api_prefix)
 from src.bookings.router import router as bookings_router
 app.include_router(bookings_router, prefix=settings.api_prefix)
 
+# Payment router
+from src.payments.router import router as payments_router
+app.include_router(payments_router, prefix=settings.api_prefix)
+
+# My Studios router
+from src.my_studios.router import router as my_studios_router
+app.include_router(my_studios_router, prefix=settings.api_prefix)
+
 # TODO: Register additional routers as they are implemented
-# from src.payments.router import router as payments_router
 # from src.messages.router import router as messages_router
 # from src.teams.router import router as teams_router
 
-# app.include_router(payments_router, prefix=settings.api_prefix)
 # app.include_router(messages_router, prefix=settings.api_prefix)
 # app.include_router(teams_router, prefix=settings.api_prefix)
 

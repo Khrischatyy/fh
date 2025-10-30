@@ -85,6 +85,13 @@ class BookingException(AppException):
         super().__init__(status_code=status_code, detail=detail)
 
 
+class NotImplementedException(AppException):
+    """Feature not yet implemented exception."""
+
+    def __init__(self, detail: str = "Feature not yet implemented"):
+        super().__init__(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=detail)
+
+
 # Exception Handlers
 
 

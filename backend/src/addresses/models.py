@@ -58,8 +58,8 @@ class Address(Base, IDMixin, TimestampMixin):
 
     # Location
     street: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    latitude: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 6), nullable=True)
-    longitude: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 6), nullable=True)
+    latitude: Mapped[Optional[Decimal]] = mapped_column(Numeric(9, 6), nullable=True)
+    longitude: Mapped[Optional[Decimal]] = mapped_column(Numeric(9, 6), nullable=True)
     timezone: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     # Rating
@@ -140,7 +140,22 @@ class Address(Base, IDMixin, TimestampMixin):
         return f"<Address(id={self.id}, name={self.name}, slug={self.slug})>"
 
 
-class OperatingHour(Base, IDMixin):
+class OperatingMode(Base):
+    """Operating mode for hours - lookup table."""
+
+    __tablename__ = "operating_modes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    mode: Mapped[str] = mapped_column(String(50), nullable=False)
+    label: Mapped[str] = mapped_column(String(100), nullable=False)
+    description_registration: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    description_customer: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+    def __repr__(self) -> str:
+        return f"<OperatingMode(id={self.id}, mode={self.mode})>"
+
+
+class OperatingHour(Base, IDMixin, TimestampMixin):
     """Operating hours for a studio - matches Laravel database schema."""
 
     __tablename__ = "operating_hours"
@@ -252,7 +267,7 @@ class Equipment(Base, IDMixin, TimestampMixin):
         return f"<Equipment(id={self.id}, name={self.name})>"
 
 
-class Badge(Base, IDMixin):
+class Badge(Base, IDMixin, TimestampMixin):
     """Badge/amenity tags for studios (e.g., WiFi, Parking, etc.) - matches Laravel schema."""
 
     __tablename__ = "badges"

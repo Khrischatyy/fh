@@ -23,6 +23,9 @@ from src.rooms.dependencies import get_room_service
 
 router = APIRouter(prefix="/rooms", tags=["Rooms"])
 
+# Laravel-compatible singular /room routes
+room_router = APIRouter(prefix="/room", tags=["Room"])
+
 
 # Room Endpoints
 
@@ -228,3 +231,30 @@ async def delete_photo(
     Delete a photo.
     """
     await service.delete_photo(photo_id)
+
+
+# Laravel-compatible price endpoint
+@room_router.get(
+    "/{room_id}/prices",
+    summary="Get room prices (Laravel-compatible)",
+    description="Laravel-compatible endpoint to retrieve all price tiers for a room.",
+)
+async def get_room_prices_laravel(
+    room_id: int,
+    service: Annotated[RoomService, Depends(get_room_service)],
+):
+    """
+    Get all price tiers for a room (Laravel-compatible route).
+
+    This endpoint matches Laravel's URL pattern: GET /api/room/{room_id}/prices
+    """
+    prices = await service.get_prices(room_id)
+    prices_data = [RoomPriceResponse.model_validate(price).model_dump() for price in prices]
+
+    # Return Laravel-compatible format
+    return {
+        "success": True,
+        "data": prices_data,
+        "message": "Room prices retrieved successfully",
+        "code": 200
+    }

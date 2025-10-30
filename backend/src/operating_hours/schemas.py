@@ -7,13 +7,27 @@ from pydantic import BaseModel, Field, field_validator
 from src.addresses.models import OperationMode
 
 
+# Operating Mode Schemas
+
+class OperatingModeResponse(BaseModel):
+    """Operating mode response schema."""
+    id: int
+    mode: str
+    label: str
+    description_registration: Optional[str] = None
+    description_customer: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 # Operating Hours Schemas
 
 class OperatingHourBase(BaseModel):
     """Base operating hour schema."""
     day_of_week: int = Field(..., ge=0, le=6, description="Day of week (0=Monday, 6=Sunday)")
-    start_time: Optional[time] = Field(None, description="Opening time")
-    end_time: Optional[time] = Field(None, description="Closing time")
+    open_time: Optional[time] = Field(None, description="Opening time")
+    close_time: Optional[time] = Field(None, description="Closing time")
     operation_mode: OperationMode = Field(default=OperationMode.OPEN)
 
 
@@ -26,23 +40,23 @@ class OperatingHourCreate(OperatingHourBase):
         """Validate operation mode constraints."""
         data = info.data
 
-        # If mode is OPEN, both start_time and end_time are required
+        # If mode is OPEN, both open_time and close_time are required
         if v == OperationMode.OPEN:
-            if not data.get("start_time") or not data.get("end_time"):
-                raise ValueError("start_time and end_time are required when operation_mode is 'open'")
+            if not data.get("open_time") or not data.get("close_time"):
+                raise ValueError("open_time and close_time are required when operation_mode is 'open'")
 
         # If mode is CLOSED, times should be None
         if v == OperationMode.CLOSED:
-            if data.get("start_time") or data.get("end_time"):
-                raise ValueError("start_time and end_time must be null when operation_mode is 'closed'")
+            if data.get("open_time") or data.get("close_time"):
+                raise ValueError("open_time and close_time must be null when operation_mode is 'closed'")
 
         return v
 
 
 class OperatingHourUpdate(BaseModel):
     """Schema for updating an operating hour."""
-    start_time: Optional[time] = None
-    end_time: Optional[time] = None
+    open_time: Optional[time] = None
+    close_time: Optional[time] = None
     operation_mode: Optional[OperationMode] = None
 
 

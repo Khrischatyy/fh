@@ -3,9 +3,12 @@ Address router - API endpoint definitions.
 Handles HTTP requests and delegates to service layer.
 """
 from typing import Annotated, Any
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Query
 
 from src.addresses.dependencies import get_address_service
+from src.operating_hours.dependencies import get_operating_hours_service
+from src.operating_hours.schemas import OperatingHourResponse, OperatingModeResponse
+from src.operating_hours.service import OperatingHoursService
 from src.addresses.schemas import (
     AddressCreate,
     AddressResponse,
@@ -412,3 +415,200 @@ async def get_studio_by_slug(
                         break
 
         return addr_dict
+
+
+# Laravel-compatible operating hours endpoints
+@address_router.get(
+    "/operating-hours",
+    summary="Get operating hours (Laravel-compatible)",
+    description="Laravel-compatible endpoint to retrieve operating hours for an address using query parameter.",
+)
+async def get_operating_hours_laravel(
+    address_id: Annotated[int, Query(description="Address ID")],
+    service: Annotated[OperatingHoursService, Depends(get_operating_hours_service)],
+):
+    """
+    Get operating hours for an address (Laravel-compatible route).
+
+    This endpoint matches Laravel's URL pattern: GET /api/address/operating-hours?address_id=13
+    """
+    operating_hours = await service.get_operating_hours_by_address(address_id)
+    hours_data = [OperatingHourResponse.model_validate(hour).model_dump() for hour in operating_hours]
+
+    # Return Laravel-compatible format with data wrapper
+    return {
+        "success": True,
+        "data": hours_data,
+        "message": "Operating hours retrieved successfully",
+        "code": 200
+    }
+
+
+@address_router.post(
+    "/operating-hours",
+    status_code=status.HTTP_201_CREATED,
+    summary="Set operating hours (Laravel-compatible)",
+    description="Laravel-compatible endpoint to set operating hours for an address.",
+)
+async def set_operating_hours_laravel(
+    data: dict,
+    service: Annotated[OperatingHoursService, Depends(get_operating_hours_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Set operating hours for an address (Laravel-compatible route).
+
+    Handles three modes:
+    - Mode 1 (24/7): Only requires mode_id and address_id
+    - Mode 2 (Fixed): Requires mode_id, address_id, open_time, close_time
+    - Mode 3 (Variable): Requires mode_id, address_id, and hours array
+    """
+    from src.addresses.models import OperatingHour
+    from datetime import time as time_type
+
+    # Convert address_id and mode_id to integers (they come as strings from frontend)
+    address_id = int(data.get("address_id")) if data.get("address_id") else None
+    mode_id = int(data.get("mode_id")) if data.get("mode_id") else None
+
+    if not address_id or not mode_id:
+        from src.exceptions import ConflictException
+        raise ConflictException("address_id and mode_id are required")
+
+    # Delete existing operating hours for this address
+    await service.delete_operating_hours_by_address(address_id)
+
+    created_hours = []
+
+    if mode_id == 1:
+        # Mode 1: 24/7 - Create one record for Sunday (day 0)
+        operating_hour = OperatingHour(
+            address_id=address_id,
+            mode_id=mode_id,
+            day_of_week=0,
+            open_time=time_type(0, 0, 0),
+            close_time=time_type(23, 59, 59),
+            is_closed=False,
+        )
+        created = await service._repository.create_operating_hour(operating_hour)
+        created_hours.append(created)
+
+    elif mode_id == 2:
+        # Mode 2: Fixed hours - Same hours every day (one record for Monday, day 1)
+        open_time_str = data.get("open_time")
+        close_time_str = data.get("close_time")
+
+        if not open_time_str or not close_time_str:
+            from src.exceptions import ConflictException
+            raise ConflictException("open_time and close_time are required for mode 2")
+
+        # Parse time strings (format: "HH:MM" or "HH:MM:SS")
+        open_parts = open_time_str.split(":")
+        close_parts = close_time_str.split(":")
+
+        open_time = time_type(int(open_parts[0]), int(open_parts[1]))
+        close_time = time_type(int(close_parts[0]), int(close_parts[1]))
+
+        operating_hour = OperatingHour(
+            address_id=address_id,
+            mode_id=mode_id,
+            day_of_week=1,  # Monday
+            open_time=open_time,
+            close_time=close_time,
+            is_closed=False,
+        )
+        created = await service._repository.create_operating_hour(operating_hour)
+        created_hours.append(created)
+
+    elif mode_id == 3:
+        # Mode 3: Variable hours - Different hours for each day
+        hours = data.get("hours", [])
+
+        if not hours:
+            from src.exceptions import ConflictException
+            raise ConflictException("hours array is required for mode 3")
+
+        for hour_data in hours:
+            day_of_week = int(hour_data.get("day_of_week")) if hour_data.get("day_of_week") is not None else None
+            is_closed = hour_data.get("is_closed", False)
+
+            if is_closed:
+                # Create a closed day entry
+                operating_hour = OperatingHour(
+                    address_id=address_id,
+                    mode_id=mode_id,
+                    day_of_week=day_of_week,
+                    open_time=None,
+                    close_time=None,
+                    is_closed=True,
+                )
+            else:
+                open_time_str = hour_data.get("open_time")
+                close_time_str = hour_data.get("close_time")
+
+                if not open_time_str or not close_time_str:
+                    continue
+
+                open_parts = open_time_str.split(":")
+                close_parts = close_time_str.split(":")
+
+                open_time = time_type(int(open_parts[0]), int(open_parts[1]))
+                close_time = time_type(int(close_parts[0]), int(close_parts[1]))
+
+                operating_hour = OperatingHour(
+                    address_id=address_id,
+                    mode_id=mode_id,
+                    day_of_week=day_of_week,
+                    open_time=open_time,
+                    close_time=close_time,
+                    is_closed=False,
+                )
+
+            created = await service._repository.create_operating_hour(operating_hour)
+            created_hours.append(created)
+
+    # Return Laravel-compatible format
+    hours_data = [OperatingHourResponse.model_validate(hour).model_dump() for hour in created_hours]
+
+    return {
+        "success": True,
+        "data": hours_data,
+        "message": "Operating hours set successfully",
+        "code": 201
+    }
+
+
+# Laravel-compatible badges endpoints
+@address_router.get(
+    "/{address_id}/badges",
+    summary="Get all available badges (Laravel-compatible)",
+    description="Laravel-compatible endpoint to retrieve all available badges for an address.",
+)
+async def get_all_badges_laravel(
+    address_id: int,
+    service: Annotated[AddressService, Depends(get_address_service)],
+):
+    """
+    Get all available badges (Laravel-compatible route).
+
+    This endpoint matches Laravel's URL pattern: GET /api/address/{address_id}/badges
+    Returns all badges in the system, not just the ones assigned to this address.
+    """
+    from src.addresses.models import Badge
+    from sqlalchemy import select
+    from src.database import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as session:
+        # Get all badges from the database
+        stmt = select(Badge).order_by(Badge.id)
+        result = await session.execute(stmt)
+        badges = list(result.scalars().all())
+
+        badges_data = [BadgeResponse.model_validate(badge).model_dump() for badge in badges]
+
+        # Return Laravel-compatible format
+        return {
+            "success": True,
+            "data": badges_data,
+            "message": "Badges retrieved successfully",
+            "code": 200
+        }

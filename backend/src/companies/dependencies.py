@@ -5,13 +5,13 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database import get_async_session
+from src.database import get_db
 from src.companies.repository import CompanyRepository
 from src.companies.service import CompanyService
 
 
 async def get_company_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)]
+    session: Annotated[AsyncSession, Depends(get_db)]
 ) -> CompanyRepository:
     """Provide CompanyRepository instance."""
     return CompanyRepository(session)

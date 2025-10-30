@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from src.bookings.models import Booking, BookingStatus
 from src.rooms.models import Room, RoomPrice
 from src.addresses.models import Address, OperatingHour
+from src.companies.models import Company
 
 
 class BookingRepository:
@@ -20,12 +21,13 @@ class BookingRepository:
         self._session = session
 
     async def get_room_with_address(self, room_id: int) -> Optional[Room]:
-        """Get room with address and operating hours."""
+        """Get room with address, operating hours, and company."""
         stmt = (
             select(Room)
             .where(Room.id == room_id)
             .options(
                 selectinload(Room.address).selectinload(Address.operating_hours),
+                selectinload(Room.address).selectinload(Address.company),
                 selectinload(Room.prices),
             )
         )
@@ -130,8 +132,14 @@ class BookingRepository:
         return booking
 
     async def get_booking_by_id(self, booking_id: int) -> Optional[Booking]:
-        """Get booking by ID."""
-        stmt = select(Booking).where(Booking.id == booking_id)
+        """Get booking by ID with room and address relationships."""
+        stmt = (
+            select(Booking)
+            .where(Booking.id == booking_id)
+            .options(
+                selectinload(Booking.room).selectinload(Room.address)
+            )
+        )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
