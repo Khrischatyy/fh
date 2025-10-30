@@ -612,3 +612,56 @@ async def get_all_badges_laravel(
             "message": "Badges retrieved successfully",
             "code": 200
         }
+
+
+# Laravel-compatible equipment-type endpoint
+@address_router.get(
+    "/equipment-type",
+    summary="Get all equipment types (Laravel-compatible)",
+    description="Laravel-compatible endpoint to retrieve all equipment types.",
+)
+async def get_equipment_types_laravel(
+    service: Annotated[AddressService, Depends(get_address_service)],
+):
+    """
+    Get all equipment types (Laravel-compatible route).
+
+    This endpoint matches Laravel's URL pattern: GET /api/address/equipment-type
+    """
+    equipment_types = await service.get_equipment_types()
+    equipment_types_data = [EquipmentTypeResponse.model_validate(et).model_dump() for et in equipment_types]
+
+    # Return Laravel-compatible format
+    return {
+        "success": True,
+        "data": equipment_types_data,
+        "message": "Equipment types retrieved successfully",
+        "code": 200
+    }
+
+
+# Laravel-compatible equipment endpoint
+@address_router.get(
+    "/{address_id}/equipment",
+    summary="Get equipment for an address (Laravel-compatible)",
+    description="Laravel-compatible endpoint to retrieve equipment for a specific address.",
+)
+async def get_address_equipment_laravel(
+    address_id: int,
+    service: Annotated[AddressService, Depends(get_address_service)],
+):
+    """
+    Get equipment for an address (Laravel-compatible route).
+
+    This endpoint matches Laravel's URL pattern: GET /api/address/{address_id}/equipment
+    """
+    equipment = await service.get_address_equipment(address_id)
+    equipment_data = [EquipmentWithTypeResponse.model_validate(eq).model_dump() for eq in equipment]
+
+    # Return Laravel-compatible format
+    return {
+        "success": True,
+        "data": equipment_data,
+        "message": "Equipment retrieved successfully",
+        "code": 200
+    }

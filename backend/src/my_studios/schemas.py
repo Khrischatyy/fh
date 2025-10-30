@@ -94,6 +94,22 @@ class RoomPriceResponse(BaseModel):
         from_attributes = True
 
 
+class RoomResponse(BaseModel):
+    """Room response schema."""
+    id: int
+    name: Optional[str] = None
+    address_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    # Nested relationships
+    photos: list[RoomPhotoResponse] = []
+    prices: list[RoomPriceResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
 class StudioResponse(BaseModel):
     """Studio/Address response schema for my-studios endpoints."""
 
@@ -110,14 +126,19 @@ class StudioResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # Additional fields for frontend compatibility
+    stripe_account_id: Optional[str] = None
+    is_complete: bool = False
+
     # Nested relationships
     city: Optional[CityResponse] = None
     company: Optional[CompanyResponse] = None
     badges: list[BadgeResponse] = []
     operating_hours: list[OperatingHourResponse] = []
+    rooms: list[RoomResponse] = []
 
-    # Note: photos and prices are on Room, but frontend expects them on Address
-    # We'll need to aggregate them from all rooms
+    # Note: photos and prices are on Room, but frontend expects them on Address too
+    # We'll aggregate them from all rooms
     photos: list[RoomPhotoResponse] = []
     prices: list[RoomPriceResponse] = []
 

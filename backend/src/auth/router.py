@@ -182,12 +182,36 @@ async def login(
 @router.get("/me", response_model=schemas.UserResponse)
 async def get_current_user_info(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    Get current authenticated user information.
+    Get current authenticated user information with company data.
     Requires authentication token in Authorization header.
     """
-    return current_user
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    from src.companies.models import AdminCompany, Company
+
+    # Fetch user with admin_companies relationship
+    stmt = (
+        select(User)
+        .where(User.id == current_user.id)
+        .options(
+            selectinload(User.admin_companies).selectinload(AdminCompany.company)
+        )
+    )
+    result = await db.execute(stmt)
+    user = result.scalar_one()
+
+    # Create response dict
+    user_dict = schemas.UserResponse.model_validate(user).model_dump()
+
+    # Add company if user has admin_companies
+    if user.admin_companies and len(user.admin_companies) > 0:
+        company = user.admin_companies[0].company
+        user_dict["company"] = schemas.CompanySimpleResponse.model_validate(company).model_dump()
+
+    return user_dict
 
 
 @router.get("/email/verify/{id}/{hash}")

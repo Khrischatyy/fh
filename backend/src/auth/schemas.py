@@ -58,6 +58,16 @@ class LoginResponse(BaseModel):
     role: str
 
 
+class CompanySimpleResponse(BaseModel):
+    """Simple company response for user endpoint."""
+    id: int
+    name: str
+    slug: str
+    logo: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class UserResponse(BaseModel):
     """Schema for user response (Laravel compatible)."""
     id: int
@@ -76,6 +86,7 @@ class UserResponse(BaseModel):
     google_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    company: Optional[CompanySimpleResponse] = None
 
     model_config = {"from_attributes": True}
 
