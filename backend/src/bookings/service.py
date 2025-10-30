@@ -380,3 +380,160 @@ class BookingService:
             "total_price": total_price,
             "explanation": explanation
         }
+
+    async def create_reservation(
+        self,
+        user_id: int,
+        room_id: int,
+        booking_date: date_type,
+        start_time_str: str,
+        end_time_str: str,
+        end_date: date_type,
+        engineer_id: Optional[int] = None
+    ) -> Dict[str, any]:
+        """
+        Create a new booking/reservation and generate payment link.
+
+        Args:
+            user_id: User making the booking
+            room_id: Room to book
+            booking_date: Start date of booking
+            start_time_str: Start time (HH:MM format)
+            end_time_str: End time (HH:MM format)
+            end_date: End date of booking
+            engineer_id: Optional engineer ID
+
+        Returns:
+            Dictionary with booking details and payment URL
+
+        Raises:
+            NotFoundException: If room not found
+            BadRequestException: If time slot is not available
+        """
+        # Verify room exists and load with address
+        room = await self._repository.get_room_with_address(room_id)
+        if not room:
+            raise NotFoundException(f"Room with id {room_id} not found")
+
+        if not room.address:
+            raise BadRequestException("Room has no associated address")
+
+        # Parse time strings to time objects
+        start_time = datetime.strptime(start_time_str, "%H:%M").time()
+        end_time = datetime.strptime(end_time_str, "%H:%M").time()
+
+        # Validate that the time slot is available
+        bookings = await self._repository.get_bookings_for_date(
+            room_id,
+            booking_date,
+            excluded_statuses=['cancelled', 'expired']
+        )
+
+        # Check for conflicts
+        for booking in bookings:
+            # Simple overlap check for same-day bookings
+            if booking.date == booking_date:
+                if not (end_time <= booking.start_time or start_time >= booking.end_time):
+                    raise BadRequestException(
+                        f"Time slot conflicts with existing booking. "
+                        f"Room is booked from {booking.start_time.strftime('%H:%M')} "
+                        f"to {booking.end_time.strftime('%H:%M')}"
+                    )
+
+        # Create booking with "pending" status (status_id=1)
+        booking_data = {
+            "user_id": user_id,
+            "room_id": room_id,
+            "date": booking_date,
+            "start_time": start_time,
+            "end_time": end_time,
+            "end_date": end_date,
+            "status_id": 1,  # Pending status
+        }
+
+        booking = await self._repository.create_booking(booking_data)
+
+        # Calculate total price
+        start_datetime_str = f"{booking_date.isoformat()}T{start_time_str}"
+        end_datetime_str = f"{end_date.isoformat()}T{end_time_str}"
+
+        price_result = await self.calculate_total_cost(
+            start_time_str=start_datetime_str,
+            end_time_str=end_datetime_str,
+            room_id=room_id,
+            engineer_id=engineer_id
+        )
+
+        total_price = price_result["total_price"]
+
+        # Get studio owner from address -> company -> admin
+        from sqlalchemy import select
+        from sqlalchemy.orm import selectinload
+        from src.companies.models import Company, AdminCompany
+        from src.auth.models import User
+
+        # Get company from address
+        company = room.address.company
+        if not company:
+            raise BadRequestException("Studio company not found")
+
+        # Get admin_company relationship
+        stmt = (
+            select(AdminCompany)
+            .where(AdminCompany.company_id == company.id)
+            .options(selectinload(AdminCompany.admin))
+        )
+        result = await self._repository._session.execute(stmt)
+        admin_company = result.scalar_one_or_none()
+
+        if not admin_company or not admin_company.admin:
+            raise BadRequestException("Studio owner not found")
+
+        studio_owner = admin_company.admin
+
+        if not studio_owner.payment_gateway:
+            raise BadRequestException(
+                "Studio has not configured payment gateway. "
+                "Please contact the studio owner."
+            )
+
+        # Create payment session
+        from src.payments.service import PaymentService
+        from decimal import Decimal
+
+        payment_service = PaymentService(self._repository._session)
+
+        try:
+            payment_session = await payment_service.create_payment_session(
+                booking=booking,
+                amount=Decimal(str(total_price)),
+                studio_owner=studio_owner
+            )
+
+            # Update booking with payment link
+            from datetime import timedelta
+            from src.config import settings
+
+            expiry_time = datetime.now() + timedelta(
+                minutes=settings.TEMPORARY_PAYMENT_LINK_EXPIRY_MINUTES
+            )
+
+            await self._repository.update_booking(booking, {
+                "temporary_payment_link": payment_session["payment_url"],
+                "temporary_payment_link_expires_at": expiry_time
+            })
+
+            return {
+                "booking_id": booking.id,
+                "status": "pending",
+                "message": "Reservation created successfully",
+                "payment_url": payment_session["payment_url"],
+                "session_id": payment_session["session_id"],
+                "total_price": total_price,
+                "expires_at": expiry_time.isoformat()
+            }
+
+        except Exception as e:
+            # If payment session creation fails, we still have the booking
+            # but without payment link
+            raise BadRequestException(f"Failed to create payment session: {str(e)}")

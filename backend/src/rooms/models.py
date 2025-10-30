@@ -84,7 +84,7 @@ class RoomPhoto(Base, IDMixin):
         return f"<RoomPhoto(id={self.id}, room_id={self.room_id}, index={self.index})>"
 
 
-class RoomPrice(Base, IDMixin):
+class RoomPrice(Base, IDMixin, TimestampMixin):
     """Pricing tiers for room bookings based on duration - matches Laravel schema."""
 
     __tablename__ = "room_prices"

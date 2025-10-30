@@ -15,6 +15,7 @@ from src.operating_hours.schemas import (
     StudioClosureCreate,
     StudioClosureResponse,
     StudioClosureUpdate,
+    OperatingModeResponse,
 )
 from src.operating_hours.service import OperatingHoursService
 from src.auth.dependencies import get_current_user
@@ -22,6 +23,22 @@ from src.auth.models import User
 
 
 router = APIRouter(prefix="/operating-hours", tags=["Operating Hours"])
+
+
+# Operating Mode Endpoints
+
+@router.get(
+    "/modes",
+    response_model=list[OperatingModeResponse],
+    summary="Get all operating modes",
+    description="Retrieve all available operating modes (24/7, Fixed Hours, Variable Hours).",
+)
+async def get_operation_modes(
+    service: Annotated[OperatingHoursService, Depends(get_operating_hours_service)],
+) -> list[OperatingModeResponse]:
+    """Get all available operating modes."""
+    modes = await service.get_all_operating_modes()
+    return [OperatingModeResponse.model_validate(mode) for mode in modes]
 
 
 # Operating Hours Endpoints

@@ -5,7 +5,7 @@ Orchestrates operations between repository and enforces business rules.
 from datetime import date
 from typing import Optional
 
-from src.addresses.models import OperatingHour, StudioClosure
+from src.addresses.models import OperatingHour, StudioClosure, OperatingMode
 from src.operating_hours.repository import OperatingHoursRepository
 from src.operating_hours.schemas import (
     OperatingHourCreate,
@@ -131,6 +131,12 @@ class OperatingHoursService:
         operating_hour = await self.get_operating_hour(hour_id)
         await self._repository.delete_operating_hour(operating_hour)
 
+    async def delete_operating_hours_by_address(self, address_id: int) -> None:
+        """Delete all operating hours for an address."""
+        operating_hours = await self._repository.find_operating_hours_by_address(address_id)
+        for hour in operating_hours:
+            await self._repository.delete_operating_hour(hour)
+
     # StudioClosure operations
 
     async def create_studio_closure(
@@ -226,3 +232,9 @@ class OperatingHoursService:
         """Delete a studio closure by ID."""
         closure = await self.get_studio_closure(closure_id)
         await self._repository.delete_studio_closure(closure)
+
+    # Operating Mode operations
+
+    async def get_all_operating_modes(self) -> list[OperatingMode]:
+        """Get all available operating modes."""
+        return await self._repository.get_all_operating_modes()

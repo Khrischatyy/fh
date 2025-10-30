@@ -10,8 +10,12 @@ from src.bookings.service import BookingService
 from src.bookings.schemas import (
     AvailableTimesResponse,
     CalculatePriceRequest,
-    CalculatePriceResponse
+    CalculatePriceResponse,
+    CreateReservationRequest,
+    CreateReservationResponse
 )
+from src.auth.dependencies import get_current_user
+from src.auth.models import User
 
 
 router = APIRouter(tags=["Bookings"])
@@ -132,4 +136,60 @@ async def calculate_booking_price(
     return CalculatePriceResponse(
         total_price=result["total_price"],
         explanation=result["explanation"]
+    )
+
+
+@router.post(
+    "/room/reservation",
+    response_model=CreateReservationResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create room reservation",
+    description="Create a new room booking/reservation."
+)
+async def create_room_reservation(
+    request: Annotated[CreateReservationRequest, Body()],
+    service: Annotated[BookingService, Depends(get_booking_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> CreateReservationResponse:
+    """
+    Create a new room reservation.
+
+    **Request Body:**
+    - **addressSlug**: Address slug for validation
+    - **room_id**: ID of the room to book
+    - **engineer_id**: Optional engineer ID
+    - **date**: Booking start date (YYYY-MM-DD)
+    - **start_time**: Start time (HH:MM)
+    - **end_time**: End time (HH:MM)
+    - **end_date**: Booking end date (YYYY-MM-DD)
+
+    **Returns:**
+    - **message**: Success message
+    - **booking_id**: Created booking ID
+    - **status**: Booking status (pending, confirmed, etc.)
+
+    **Business Rules:**
+    - User must be authenticated
+    - Time slot must be available
+    - Booking is created with "pending" status
+    - Payment link will be generated separately
+    """
+    result = await service.create_reservation(
+        user_id=current_user.id,
+        room_id=request.room_id,
+        booking_date=request.date,
+        start_time_str=request.start_time,
+        end_time_str=request.end_time,
+        end_date=request.end_date,
+        engineer_id=request.engineer_id
+    )
+
+    return CreateReservationResponse(
+        message=result["message"],
+        booking_id=result["booking_id"],
+        status=result["status"],
+        payment_url=result["payment_url"],
+        session_id=result["session_id"],
+        total_price=result["total_price"],
+        expires_at=result["expires_at"]
     )

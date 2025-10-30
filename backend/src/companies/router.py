@@ -1,8 +1,8 @@
 """
 Company router - HTTP endpoints for company management.
 """
-from typing import Annotated
-from fastapi import APIRouter, Depends, status
+from typing import Annotated, Optional
+from fastapi import APIRouter, Depends, status, Form
 
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
@@ -11,11 +11,16 @@ from src.companies.schemas import (
     CompanyUpdate,
     CompanyResponse,
     CompanyWithAddressesResponse,
+    BrandCreateRequest,
+    BrandCreateResponse,
 )
 from src.companies.service import CompanyService
 from src.companies.dependencies import get_company_service
 
 router = APIRouter(prefix="/companies", tags=["Companies"])
+
+# Brand router (no prefix, matches Laravel route)
+brand_router = APIRouter(tags=["Brand"])
 
 
 @router.post("/", response_model=CompanyResponse, status_code=status.HTTP_201_CREATED)
@@ -139,3 +144,92 @@ async def delete_company(
         raise ForbiddenException("You are not authorized to delete this company")
 
     await service.delete_company(company_id)
+
+
+# Brand creation endpoint (matches Laravel POST /api/brand)
+@brand_router.post(
+    "/brand",
+    status_code=status.HTTP_201_CREATED,
+    summary="Create brand (company + address + default setup)",
+    description="Creates a complete brand setup: company, address, default room, and default operating hours."
+)
+async def create_brand(
+    company: Annotated[str, Form(description="Company name (unique)")],
+    street: Annotated[str, Form(description="Street address")],
+    city: Annotated[str, Form(description="City name")],
+    country: Annotated[str, Form(description="Country name")],
+    latitude: Annotated[float, Form(ge=-90, le=90, description="Latitude")],
+    longitude: Annotated[float, Form(ge=-180, le=180, description="Longitude")],
+    zip: Annotated[str, Form(description="ZIP/Postal code")],
+    timezone: Annotated[str, Form(description="Timezone")],
+    service: Annotated[CompanyService, Depends(get_company_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    address: Annotated[Optional[str], Form(description="Full address (optional)")] = None,
+    about: Annotated[Optional[str], Form(description="About (optional)")] = None,
+):
+    """
+    Create a complete brand/studio setup in one request.
+
+    This endpoint is a convenience method that creates:
+    - Company (brand)
+    - Address with geolocation
+    - Default room ("Room1")
+    - Default operating hours (24/7)
+    - Default pricing ($60/hour)
+
+    **Form Data:**
+    - **company**: Company name (must be unique)
+    - **street**: Street address
+    - **city**: City name
+    - **country**: Country name
+    - **latitude**: Latitude coordinate
+    - **longitude**: Longitude coordinate
+    - **zip**: ZIP/Postal code
+    - **timezone**: Timezone (e.g., "America/Los_Angeles")
+    - **address**: Full address (optional)
+    - **about**: About the studio (optional)
+
+    **Returns:**
+    - **slug**: Company slug
+    - **address_id**: Created address ID
+    - **room_id**: Created room ID
+
+    **Business Rules:**
+    - User must be authenticated
+    - User must have "studio_owner" role
+    - User can only have one company (throws error if already exists)
+    - Country and city are created if they don't exist
+    - Address slug is auto-generated from company name and city
+    """
+    # Check if user is studio owner
+    if current_user.role != "studio_owner":
+        from src.exceptions import ForbiddenException
+        raise ForbiddenException("You are not studio owner")
+
+    # Create request object from form data
+    data = BrandCreateRequest(
+        company=company,
+        street=street,
+        city=city,
+        country=country,
+        latitude=latitude,
+        longitude=longitude,
+        zip=zip,
+        timezone=timezone,
+        address=address,
+        about=about,
+    )
+
+    result = await service.create_brand(data, current_user.id)
+
+    # Return Laravel-compatible response format
+    return {
+        "success": True,
+        "data": {
+            "slug": result["slug"],
+            "address_id": result["address_id"],
+            "room_id": result["room_id"],
+        },
+        "message": "Company and address added",
+        "code": 201
+    }
