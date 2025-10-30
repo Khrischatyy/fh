@@ -44,6 +44,19 @@ help:
 	@echo "  make clean             - Stop and remove all containers"
 	@echo "  make clean-all         - Remove ALL Docker resources (CAUTION)"
 	@echo ""
+	@echo "$(BLUE)🚀 Production:$(NC)"
+	@echo "  make prod-update              - Full production update (pull, rebuild, restart)"
+	@echo "  make prod-build               - Build and start production services"
+	@echo "  make prod-restart             - Restart all production services"
+	@echo "  make prod-restart-frontend    - Restart frontend only"
+	@echo "  make prod-restart-api         - Restart API only"
+	@echo "  make prod-rebuild-frontend    - Rebuild and restart frontend"
+	@echo "  make status-prod              - Show production container status"
+	@echo "  make logs-prod-all            - View all production logs"
+	@echo "  make logs-prod-frontend       - View frontend logs"
+	@echo "  make migrate-prod             - Run production migrations"
+	@echo "  make health-prod              - Check production health"
+	@echo ""
 	@echo "$(YELLOW)📍 Service URLs:$(NC)"
 	@echo "  - FastAPI:          http://localhost (docs: /docs)"
 	@echo "  - Frontend:         http://localhost:3000"
@@ -228,19 +241,105 @@ prod-build:
 
 build-prod: prod-build
 
+prod-update:
+	@echo "$(GREEN)=========================================$(NC)"
+	@echo "$(GREEN)🚀 Updating Production Environment$(NC)"
+	@echo "$(GREEN)=========================================$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Step 1/5: Pulling latest code...$(NC)"
+	@git pull
+	@echo ""
+	@echo "$(YELLOW)Step 2/5: Stopping running containers...$(NC)"
+	@docker-compose -f prod.yml down
+	@echo ""
+	@echo "$(YELLOW)Step 3/5: Rebuilding containers...$(NC)"
+	@docker-compose -f prod.yml build --no-cache
+	@echo ""
+	@echo "$(YELLOW)Step 4/5: Starting services...$(NC)"
+	@docker-compose -f prod.yml up -d
+	@echo ""
+	@echo "$(YELLOW)Step 5/5: Running migrations...$(NC)"
+	@sleep 10
+	@docker-compose -f prod.yml exec -T api alembic upgrade head || echo "$(YELLOW)Migration skipped or failed$(NC)"
+	@echo ""
+	@echo "$(GREEN)=========================================$(NC)"
+	@echo "$(GREEN)✅ Production update complete!$(NC)"
+	@echo "$(GREEN)=========================================$(NC)"
+	@echo ""
+	@make status-prod
+
+prod-restart:
+	@echo "$(YELLOW)Restarting all production services...$(NC)"
+	@docker-compose -f prod.yml restart
+	@echo "$(GREEN)✅ Services restarted!$(NC)"
+	@make status-prod
+
+prod-restart-frontend:
+	@echo "$(YELLOW)Restarting frontend container...$(NC)"
+	@docker-compose -f prod.yml restart frontend
+	@echo "$(GREEN)✅ Frontend restarted!$(NC)"
+
+prod-restart-api:
+	@echo "$(YELLOW)Restarting API container...$(NC)"
+	@docker-compose -f prod.yml restart api
+	@echo "$(GREEN)✅ API restarted!$(NC)"
+
+prod-restart-caddy:
+	@echo "$(YELLOW)Restarting Caddy proxy...$(NC)"
+	@docker-compose -f prod.yml restart caddy
+	@echo "$(GREEN)✅ Caddy restarted!$(NC)"
+
+prod-rebuild-frontend:
+	@echo "$(YELLOW)Rebuilding and restarting frontend...$(NC)"
+	@docker-compose -f prod.yml stop frontend
+	@docker-compose -f prod.yml build --no-cache frontend
+	@docker-compose -f prod.yml up -d frontend
+	@echo "$(GREEN)✅ Frontend rebuilt and restarted!$(NC)"
+
 stop-prod:
 	@docker-compose -f prod.yml stop
 
+down-prod:
+	@echo "$(YELLOW)Stopping and removing production containers...$(NC)"
+	@docker-compose -f prod.yml down
+	@echo "$(GREEN)Production services stopped$(NC)"
+
 status-prod:
+	@echo "$(GREEN)Production Service Status:$(NC)"
 	@docker-compose -f prod.yml ps
 
 logs-prod:
 	@docker-compose -f prod.yml logs -f $(container)
 
+logs-prod-all:
+	@docker-compose -f prod.yml logs -f
+
+logs-prod-api:
+	@docker-compose -f prod.yml logs -f api
+
+logs-prod-frontend:
+	@docker-compose -f prod.yml logs -f frontend
+
+logs-prod-caddy:
+	@docker-compose -f prod.yml logs -f caddy
+
+logs-prod-celery:
+	@docker-compose -f prod.yml logs -f celery_worker
+
 migrate-prod:
 	@echo "$(GREEN)Running production migrations...$(NC)"
 	@docker-compose -f prod.yml exec -T api alembic upgrade head
 	@echo "$(GREEN)✅ Migrations applied successfully!$(NC)"
+
+health-prod:
+	@echo "$(GREEN)Checking production service health...$(NC)"
+	@echo ""
+	@echo "$(BLUE)API Health:$(NC)"
+	@curl -f https://funny-how.com/health 2>/dev/null && echo " ✅" || echo " ❌"
+	@echo ""
+	@echo "$(BLUE)Frontend:$(NC)"
+	@curl -f https://funny-how.com 2>/dev/null && echo " ✅" || echo " ❌"
+	@echo ""
 
 # ==============================================================================
 # Cleanup Commands
