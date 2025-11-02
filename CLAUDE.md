@@ -737,6 +737,122 @@ Express.js with Socket.io for real-time messaging. Connects to Redis and Postgre
 - Chat service: http://localhost:6001
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
+- **MCP Server**: http://127.0.0.1/mcp (internal network: http://api:8000/mcp)
+
+## MCP Server Integration
+
+The FastAPI backend includes an integrated MCP (Model Context Protocol) server that automatically exposes all API endpoints as MCP tools for AI agent integration.
+
+### Overview
+
+- **Library**: FastMCP (Python MCP server library)
+- **Location**: Mounted at `/mcp` endpoint
+- **Purpose**: Enable AI agents (Twilio SMS campaigns, LLM integrations) to interact with the API
+- **Auto-exposure**: All FastAPI routes are automatically available as MCP tools
+
+### Implementation
+
+The MCP server is implemented in the `backend/src/mcp/` module:
+
+```
+backend/src/mcp/
+├── __init__.py
+├── server.py          # FastMCP server setup and configuration
+```
+
+Integration happens automatically in `main.py` via `setup_mcp(app)` after middleware and exception handlers are registered.
+
+### Security
+
+- **Internal-only**: MCP endpoint is NOT exposed via Caddy reverse proxy
+- **Network**: Accessible only within Docker internal network
+- **Usage**: Intended for server-to-server communication (Twilio, internal services)
+- **Authentication**: Currently no authentication (internal service)
+
+**Important**: If you need to expose MCP externally in the future, add API key authentication first.
+
+### Usage Example (Internal Services)
+
+```python
+# Internal service connecting to MCP
+import httpx
+
+async def call_mcp_tool():
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "http://api:8000/mcp",
+            json={
+                "tool": "auth/register",
+                "parameters": {...}
+            }
+        )
+        return response.json()
+```
+
+### Testing MCP
+
+Once containers are running:
+
+```bash
+# From within Docker network (e.g., another container)
+curl http://api:8000/mcp
+
+# Via Caddy proxy (if enabled)
+curl http://localhost/mcp
+```
+
+### Adding Custom MCP Tools
+
+FastMCP automatically discovers all FastAPI routes. To add custom MCP-specific tools:
+
+1. Add new FastAPI endpoints to any router
+2. The MCP server will automatically expose them as tools
+3. No additional configuration needed
+
+### Testing with Pydantic AI Chat Agent
+
+A simple terminal chat agent is provided to test the MCP server integration:
+
+**Location**: `backend/mcp_chat.py`
+
+**Dependencies**: Automatically installed in Docker image (included in `pyproject.toml` optional dependencies)
+
+**Run the chat agent**:
+```bash
+# Make sure the API server is running first
+docker compose -f dev.yml up -d
+
+# Start the chat agent (no installation needed!)
+docker compose -f dev.yml exec api python mcp_chat.py
+```
+
+**Note**: If you rebuild the Docker image, dependencies are automatically installed. No manual `pip install` needed!
+
+**Features**:
+- Interactive terminal chat with Claude Sonnet 4.0
+- Access to all 88 FastAPI endpoints as MCP tools
+- Streaming responses for better UX
+- Message history for contextual conversations
+- Automatic connection testing
+
+**Example conversation**:
+```
+🧑 You: What tools do you have access to?
+🤖 Assistant: I have access to 88 tools from the FastAPI backend...
+
+🧑 You: Can you help me create a new user?
+🤖 Assistant: [Uses auth/register endpoint via MCP]
+
+🧑 You: Show me all companies
+🤖 Assistant: [Uses companies endpoint via MCP]
+```
+
+**Environment Variables** (already in root `.env`):
+```bash
+ANTHROPIC_API_KEY=your-api-key-here  # Required
+MCP_SERVER_URL=http://localhost:8000/mcp/mcp  # Optional (default shown)
+CHAT_MODEL=anthropic:claude-sonnet-4-0  # Optional (default shown)
+```
 
 **Admin Panel:**
 - SQLAdmin interface for managing all database models (27 models)

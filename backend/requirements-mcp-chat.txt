@@ -1,0 +1,8 @@
+# Pydantic AI MCP Chat Agent Dependencies
+# Install with: pip install -r requirements-mcp-chat.txt
+
+# Pydantic AI with MCP and Anthropic support
+pydantic-ai-slim[mcp,anthropic]>=0.0.14
+
+# Environment variable management
+python-dotenv>=1.0.0

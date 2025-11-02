@@ -73,6 +73,9 @@ dependencies = [
     # Admin Panel
     "sqladmin>=0.16.0",
 
+    # MCP Server
+    "fastmcp>=0.1.0",
+
     # Monitoring (optional)
     "sentry-sdk[fastapi]>=1.39.0",
 ]
@@ -113,6 +116,11 @@ prod = [
 
     # Performance
     "orjson>=3.9.0",
+]
+
+mcp-chat = [
+    # Pydantic AI MCP Chat Agent
+    "pydantic-ai-slim[mcp,anthropic]>=0.0.14",
 ]
 
 [build-system]

@@ -2,9 +2,8 @@ import { watch } from 'vue'
 import { onBeforeMount } from 'vue'
 import {defineNuxtRouteMiddleware, navigateTo} from 'nuxt/app'
 import { useRouter } from 'vue-router'
-import { useSessionStore } from '~/src/entities/Session'
+import { useSessionStore, ACCESS_TOKEN_KEY } from '~/src/entities/Session'
 import {useCookie} from "#app";
-import {ACCESS_TOKEN_KEY} from "~/src/lib/api/config";
 import {useApi} from "~/src/lib/api";
 import type {ResponseDto} from "~/src/lib/api/types";
 import type {UserRoleEnum} from "~/src/entities/@abstract/User";

@@ -1,7 +1,6 @@
 import { defineNuxtRouteMiddleware, navigateTo } from 'nuxt/app'
 import { useCookie } from "#app";
-import { ACCESS_TOKEN_KEY } from "~/src/lib/api/config";
-import {useSessionStore} from "~/src/entities/Session";
+import {useSessionStore, ACCESS_TOKEN_KEY} from "~/src/entities/Session";
 
 export default defineNuxtRouteMiddleware((to, from) => {
     const token = useCookie(ACCESS_TOKEN_KEY).value;

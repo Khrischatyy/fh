@@ -34,7 +34,7 @@
 <script setup lang="ts">
 import { useRuntimeConfig } from '#imports';
 import {useCookie} from "#app";
-import {ACCESS_TOKEN_KEY} from "~/src/lib/api/config";
+import {ACCESS_TOKEN_KEY} from "~/src/entities/Session";
 
 const isAuthorized = useCookie(ACCESS_TOKEN_KEY).value;
 

@@ -24,6 +24,7 @@ from src.exceptions import (
     integrity_error_handler,
     generic_exception_handler,
 )
+from src.mcp import setup_mcp, get_mcp_lifespan
 
 # Import all models first to ensure SQLAlchemy relationships are properly configured
 # Import order matters: base models first, then models with foreign keys
@@ -52,6 +53,7 @@ async def lifespan(app: FastAPI):
     """
     Application lifespan manager.
     Handles startup and shutdown events.
+    Integrates MCP server lifespan for proper initialization.
     """
     # Startup
     logger.info("Starting up application...")
@@ -80,7 +82,14 @@ async def lifespan(app: FastAPI):
         )
         logger.info("Sentry initialized")
 
-    yield
+    # Integrate MCP lifespan (if MCP server is configured)
+    mcp_lifespan = get_mcp_lifespan()
+    if mcp_lifespan:
+        logger.info("Starting MCP server lifespan...")
+        async with mcp_lifespan(app):
+            yield
+    else:
+        yield
 
     # Shutdown
     logger.info("Shutting down application...")
@@ -279,6 +288,12 @@ app.include_router(messages_router, prefix=settings.api_prefix)
 # Devices router
 from src.devices.router import router as devices_router
 app.include_router(devices_router, prefix=settings.api_prefix)
+
+
+# Setup MCP server (Model Context Protocol)
+# IMPORTANT: Must be called AFTER all routers are registered
+# This allows FastMCP to access the complete OpenAPI schema with all endpoints
+setup_mcp(app)
 
 
 if __name__ == "__main__":
