@@ -123,3 +123,44 @@ class CreateReservationResponse(BaseModel):
     session_id: str = Field(..., description="Payment session ID")
     total_price: float = Field(..., description="Total booking price")
     expires_at: str = Field(..., description="Payment link expiration time")
+
+
+# Laravel-compatible booking management schemas
+
+class CancelBookingRequest(BaseModel):
+    """Cancel booking request (Laravel-compatible)."""
+    booking_id: int = Field(..., gt=0, description="Booking ID to cancel")
+
+
+class FilterBookingHistoryRequest(BaseModel):
+    """Filter bookings request (Laravel-compatible)."""
+    status: Optional[str] = Field(None, description="Filter by status name")
+    date: Optional[date_type] = Field(None, description="Filter by specific date")
+    time: Optional[time_type] = Field(None, description="Filter by time (bookings active at this time)")
+    search: Optional[str] = Field(None, description="Search by company name or address street")
+
+
+class BookingWithRelations(BaseModel):
+    """Booking with related data for list views."""
+    id: int
+    start_time: str  # HH:MM:SS format
+    end_time: str
+    date: str  # YYYY-MM-DD format
+    room_id: int
+    user_id: int
+    status_id: int
+    room: dict  # Room with address and company
+    status: dict  # Status with id and name
+    user: Optional[dict] = None  # User info (for studio owners)
+    created_at: str
+    updated_at: str
+
+    model_config = {"from_attributes": True}
+
+
+class PaginatedBookingsResponse(BaseModel):
+    """Paginated bookings response (Laravel-compatible)."""
+    current_page: int
+    data: list[dict]  # Use dict to allow flexible structure
+    per_page: int
+    total: int

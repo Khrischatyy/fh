@@ -9,6 +9,7 @@ from src.auth.models import User
 from src.rooms.schemas import (
     RoomCreate,
     RoomUpdate,
+    UpdateNameRequest,
     RoomResponse,
     RoomWithRelationsResponse,
     RoomPriceCreate,
@@ -234,86 +235,68 @@ async def delete_photo(
 
 
 # Laravel-compatible endpoints
+
 @room_router.post(
     "/add-room",
     summary="Create room (Laravel-compatible)",
     description="Laravel-compatible endpoint to create a new room.",
-    status_code=status.HTTP_201_CREATED
 )
 async def add_room_laravel(
-    data: dict,
+    data: RoomCreate,
     service: Annotated[RoomService, Depends(get_room_service)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
     Create a new room (Laravel-compatible route).
 
-    This endpoint matches Laravel's URL pattern: POST /api/room/add-room
+    Laravel: POST /api/room/add-room
 
     Request body:
-    {
-        "name": "Room name",
-        "address_id": 17
-    }
+        - name: Room name (required)
+        - address_id: Address ID (required)
     """
-    # Create RoomCreate schema from dict
-    room_data = RoomCreate(
-        name=data.get("name"),
-        address_id=data.get("address_id")
-    )
-
-    room = await service.create_room(room_data)
-    room_dict = RoomResponse.model_validate(room).model_dump()
+    room = await service.create_room(data)
+    room_data = RoomResponse.model_validate(room).model_dump()
 
     # Return Laravel-compatible format
     return {
         "success": True,
-        "data": room_dict,
-        "message": "Room created successfully",
-        "code": 201
+        "data": room_data,
+        "message": "Room created successfully.",
+        "code": 200
     }
 
 
-@room_router.post(
-    "/{room_id}/prices",
-    summary="Create room price (Laravel-compatible)",
-    description="Laravel-compatible endpoint to create a new price tier for a room.",
-    status_code=status.HTTP_201_CREATED
+@room_router.put(
+    "/{room_id}/update-name",
+    summary="Update room name (Laravel-compatible)",
+    description="Laravel-compatible endpoint to update room name.",
 )
-async def create_room_price_laravel(
+async def update_room_name_laravel(
     room_id: int,
-    data: dict,
+    request: UpdateNameRequest,
     service: Annotated[RoomService, Depends(get_room_service)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """
-    Create a new price tier for a room (Laravel-compatible route).
+    Update room name (Laravel-compatible route).
 
-    This endpoint matches Laravel's URL pattern: POST /api/room/{room_id}/prices
+    Laravel: PUT /api/room/{room}/update-name
 
     Request body:
-    {
-        "total_price": 60,
-        "hours": 1,
-        "is_enabled": true
-    }
+        - new_name: New room name (required)
     """
-    # Create RoomPriceCreate schema from dict
-    price_data = RoomPriceCreate(
-        total_price=data.get("total_price"),
-        hours=data.get("hours"),
-        is_enabled=data.get("is_enabled", True)
-    )
-
-    price = await service.create_price(room_id, price_data)
-    price_dict = RoomPriceResponse.model_validate(price).model_dump()
+    # Use RoomUpdate schema for updating
+    update_data = RoomUpdate(name=request.new_name)
+    room = await service.update_room(room_id, update_data)
+    room_data = RoomResponse.model_validate(room).model_dump()
 
     # Return Laravel-compatible format
     return {
         "success": True,
-        "data": price_dict,
-        "message": "Room price created successfully",
-        "code": 201
+        "data": room_data,
+        "message": "Name updated successfully.",
+        "code": 200
     }
 
 

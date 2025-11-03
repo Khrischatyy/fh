@@ -1,183 +1,161 @@
-"""Photo upload API endpoints."""
-
-from typing import Annotated, List
-
-from fastapi import APIRouter, Depends, UploadFile, File, Form, status, Request
-from fastapi.responses import JSONResponse
+"""
+Photos router - Laravel-compatible endpoints for photo upload and management.
+"""
+from typing import Annotated
+from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
-from src.rooms.dependencies import get_room_service
-from src.rooms.repository import RoomRepository
-from src.photos.service import PhotoService
 from src.database import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
+from src.photos.service import PhotoService
+from src.photos.schemas import PhotoUploadResponse, UpdatePhotoIndexRequest
 
 router = APIRouter(prefix="/photos", tags=["Photos"])
 
 
-def get_photo_service(
-    db: Annotated[AsyncSession, Depends(get_db)]
-) -> PhotoService:
-    """Get photo service instance."""
-    from src.rooms.repository import RoomRepository
-    room_repo = RoomRepository(db)
-    return PhotoService(room_repo)
-
-
-@router.post(
-    "/upload",
-    summary="Upload room photos",
-    description="Upload one or more photos for a room. Photos are stored in GCS.",
-    status_code=status.HTTP_201_CREATED
-)
+@router.post("/upload", status_code=status.HTTP_200_OK)
 async def upload_photos(
-    request: Request,
-    service: Annotated[PhotoService, Depends(get_photo_service)] = None,
-    current_user: Annotated[User, Depends(get_current_user)] = None,
+    room_id: Annotated[int, Form(...)],
+    photos: Annotated[list[UploadFile], File(...)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """
-    Upload photos for a room (Laravel-compatible route).
+    Upload multiple photos for a room.
 
-    This endpoint matches Laravel's URL pattern: POST /api/photos/upload
+    Laravel compatible: POST /api/photos/upload
 
-    Form data:
-    - photos[]: Multiple photo files (or photos)
-    - room_id: Room ID to associate photos with
+    Args:
+        room_id: Room ID
+        photos: Array of image files (jpeg, png, jpg, gif, svg, heic, heif - max 5MB each)
 
-    Photos are saved to: studios/<studio_slug>/photos/<uuid>.<ext>
+    Returns:
+        Array of uploaded photo objects with path and index
     """
-    # Parse multipart form data manually to handle photos[0], photos[1], etc.
-    form = await request.form()
-
-    # Get room_id
-    room_id = form.get("room_id")
-    if not room_id:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "success": False,
-                "message": "room_id is required",
-                "code": 400
-            }
-        )
-
-    try:
-        room_id = int(room_id)
-    except ValueError:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "success": False,
-                "message": "room_id must be an integer",
-                "code": 400
-            }
-        )
-
-    # Collect all photo files (handle both photos[] and photos[0], photos[1], etc.)
-    photos = []
-    for key, value in form.items():
-        # Check if it's a file field with 'photo' in the name
-        # Use hasattr to check if it has file-like methods (handles UploadFile)
-        if hasattr(value, 'read') and hasattr(value, 'filename') and 'photo' in key.lower():
-            photos.append(value)
-
+    # Validate at least one photo
     if not photos:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "success": False,
-                "message": "At least one photo is required",
-                "code": 400
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "message": "At least one photo is required.",
+                "errors": {"photos": ["At least one photo is required."]}
             }
         )
 
-    uploaded_photos = []
+    # Validate each photo
+    allowed_types = ["image/jpeg", "image/png", "image/jpg", "image/gif", "image/svg+xml", "image/heic", "image/heif"]
+    max_size = 5120 * 1024  # 5MB in bytes
 
-    for file in photos:
-        # Validate file type
-        if not file.content_type or not file.content_type.startswith("image/"):
-            return JSONResponse(
-                status_code=400,
-                content={
-                    "success": False,
-                    "message": f"Invalid file type: {file.content_type}",
-                    "code": 400
+    for idx, photo in enumerate(photos):
+        if photo.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "message": f"Photo {idx + 1} must be a file of type: jpeg, png, jpg, gif, svg, heic, heif.",
+                    "errors": {f"photos.{idx}": [f"The photo must be a file of type: jpeg, png, jpg, gif, svg, heic, heif."]}
                 }
             )
 
-        # Upload photo
-        photo = await service.upload_room_photo(room_id, file)
-
-        uploaded_photos.append({
-            "id": photo.id,
-            "path": photo.path,
-            "index": photo.index,
-            "url": f"/api/photos/image/{photo.path}"  # Proxy URL
-        })
-
-    # Return Laravel-compatible format
-    return {
-        "success": True,
-        "data": {
-            "room_id": room_id,
-            "photos": uploaded_photos,
-            "count": len(uploaded_photos)
-        },
-        "message": f"Successfully uploaded {len(uploaded_photos)} photo(s)",
-        "code": 201
-    }
-
-
-@router.get(
-    "/image/{photo_path:path}",
-    summary="Serve room photo",
-    description="Proxy endpoint to serve private photos from GCS.",
-)
-async def serve_photo(photo_path: str):
-    """
-    Serve room photo from private GCS bucket.
-
-    This endpoint proxies photos from Google Cloud Storage,
-    keeping the files private while serving them through the backend.
-
-    Example: /api/photos/image/studios/my-studio/photos/abc123.jpg
-    """
-    from fastapi.responses import StreamingResponse
-    from fastapi import HTTPException
-    from io import BytesIO
+        # Check file size
+        content = await photo.read()
+        await photo.seek(0)  # Reset pointer
+        if len(content) > max_size:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "message": f"Photo {idx + 1} must not be greater than 5120 kilobytes.",
+                    "errors": {f"photos.{idx}": ["The photo must not be greater than 5120 kilobytes."]}
+                }
+            )
 
     try:
-        from src.storage import get_gcs
-        gcs = get_gcs()
+        service = PhotoService(db)
+        uploaded_photos = await service.upload_photos(room_id, photos)
 
-        # Download the blob
-        blob = gcs.bucket.blob(photo_path)
+        # Format response
+        photos_data = [
+            {
+                "id": photo.id,
+                "room_id": photo.room_id,
+                "path": photo.path,
+                "index": photo.index,
+                "created_at": photo.created_at.isoformat() if hasattr(photo, 'created_at') and photo.created_at else None,
+                "updated_at": photo.updated_at.isoformat() if hasattr(photo, 'updated_at') and photo.updated_at else None,
+            }
+            for photo in uploaded_photos
+        ]
 
-        if not blob.exists():
-            raise HTTPException(status_code=404, detail=f"Photo not found: {photo_path}")
+        return {
+            "success": True,
+            "data": photos_data,
+            "message": "Photos uploaded successfully.",
+            "code": 200
+        }
 
-        # Download to memory
-        image_data = blob.download_as_bytes()
-
-        # Determine content type based on file extension
-        if photo_path.endswith(".png"):
-            content_type = "image/png"
-        elif photo_path.endswith(".jpg") or photo_path.endswith(".jpeg"):
-            content_type = "image/jpeg"
-        elif photo_path.endswith(".webp"):
-            content_type = "image/webp"
-        else:
-            content_type = "image/jpeg"
-
-        # Return as streaming response
-        return StreamingResponse(
-            BytesIO(image_data),
-            media_type=content_type,
-            headers={
-                "Cache-Control": "public, max-age=86400",  # Cache for 1 day
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "message": f"Failed to upload photos: {str(e)}",
+                "errors": {}
             }
         )
 
+
+@router.post("/update-index", status_code=status.HTTP_200_OK)
+async def update_photo_index(
+    request: UpdatePhotoIndexRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Update photo order index with swap logic.
+
+    Laravel compatible: POST /api/photos/update-index
+
+    Args:
+        request: Photo ID and new index
+
+    Returns:
+        Updated photo object
+
+    Note:
+        If another photo has the target index, they will be swapped automatically.
+    """
+    try:
+        service = PhotoService(db)
+        updated_photo = await service.update_photo_index(
+            request.room_photo_id,
+            request.index
+        )
+
+        # Format response
+        photo_data = {
+            "id": updated_photo.id,
+            "room_id": updated_photo.room_id,
+            "path": updated_photo.path,
+            "index": updated_photo.index,
+            "created_at": updated_photo.created_at.isoformat() if hasattr(updated_photo, 'created_at') and updated_photo.created_at else None,
+            "updated_at": updated_photo.updated_at.isoformat() if hasattr(updated_photo, 'updated_at') and updated_photo.updated_at else None,
+        }
+
+        return {
+            "success": True,
+            "data": photo_data,
+            "message": "Photo index updated successfully.",
+            "code": 200
+        }
+
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error loading photo: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "message": f"Failed to update photo index: {str(e)}",
+                "errors": {}
+            }
+        )

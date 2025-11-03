@@ -38,6 +38,18 @@ class RoomUpdate(BaseModel):
         return v.strip() if v else None
 
 
+class UpdateNameRequest(BaseModel):
+    """Schema for Laravel-compatible update name request."""
+    new_name: str = Field(..., min_length=1, max_length=255)
+
+    @field_validator("new_name")
+    @classmethod
+    def validate_new_name(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Room name cannot be empty")
+        return v.strip()
+
+
 class RoomResponse(RoomBase):
     """Room response schema."""
     id: int

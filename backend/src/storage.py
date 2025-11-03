@@ -1,134 +1,127 @@
-"""Google Cloud Storage utility."""
-
-import os
-from pathlib import Path
+"""
+Google Cloud Storage service for file uploads.
+Handles image uploads with optimization (JPEG conversion).
+"""
 from typing import Optional
-
-from google.cloud import storage
-from google.oauth2 import service_account
+from io import BytesIO
+from PIL import Image
+import uuid
 
 from src.config import settings
 
 
-class GoogleCloudStorage:
-    """Google Cloud Storage client wrapper."""
+class GCSService:
+    """Google Cloud Storage service for file uploads."""
 
     def __init__(self):
-        """Initialize GCS client with service account credentials."""
-        # Try multiple locations for the credentials file
-        possible_paths = [
-            Path(__file__).parent.parent / "safeturf-main-c4c022f13d42.json",  # backend/
-            Path("/app/safeturf-main-c4c022f13d42.json"),  # Docker container root
-            Path.cwd() / "safeturf-main-c4c022f13d42.json",  # Current working directory
-        ]
-
-        # Check for environment variable override
-        env_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        if env_path:
-            possible_paths.insert(0, Path(env_path))
-
-        credentials_path = None
-        for path in possible_paths:
-            if path.exists():
-                credentials_path = path
-                break
-
-        if not credentials_path:
-            raise FileNotFoundError(
-                f"Google Cloud credentials file not found. Tried:\n" +
-                "\n".join(f"  - {p}" for p in possible_paths) +
-                "\nPlease add the service account JSON file or set GOOGLE_APPLICATION_CREDENTIALS env var."
-            )
-
-        self.credentials = service_account.Credentials.from_service_account_file(
-            str(credentials_path)
-        )
-        self.client = storage.Client(credentials=self.credentials)
+        """Initialize GCS client."""
         self.bucket_name = settings.gcs_bucket_name
-        self.bucket = self.client.bucket(self.bucket_name)
+        self.project_id = settings.gcs_project_id
+        self._client = None
+        self._bucket = None
 
-    def get_public_url(self, blob_path: str) -> str:
-        """
-        Get public URL for a blob in the bucket.
+    def _get_client(self):
+        """Lazy load GCS client."""
+        if self._client is None:
+            from google.cloud import storage
+            if settings.gcs_credentials_path:
+                self._client = storage.Client.from_service_account_json(
+                    settings.gcs_credentials_path,
+                    project=self.project_id
+                )
+            else:
+                # Use default credentials (from environment)
+                self._client = storage.Client(project=self.project_id)
+        return self._client
 
-        Args:
-            blob_path: Path to the file in the bucket (e.g., 'public/badges/mixing.svg')
+    def _get_bucket(self):
+        """Get GCS bucket."""
+        if self._bucket is None:
+            client = self._get_client()
+            self._bucket = client.bucket(self.bucket_name)
+        return self._bucket
 
-        Returns:
-            Public URL to access the file
-        """
-        # If it's already a full URL, return as-is
-        if blob_path.startswith("http://") or blob_path.startswith("https://"):
-            return blob_path
-
-        return f"https://storage.googleapis.com/{self.bucket_name}/{blob_path}"
-
-    def upload_file(
+    async def upload_image(
         self,
-        source_file_path: str,
-        destination_blob_name: str,
-        content_type: Optional[str] = None,
-        make_public: bool = True
+        file_content: bytes,
+        destination_path: str,
+        convert_to_jpeg: bool = True,
+        optimize: bool = True,
+        quality: int = 85
     ) -> str:
         """
-        Upload a file to Google Cloud Storage.
+        Upload image to GCS with optional conversion and optimization.
 
         Args:
-            source_file_path: Local file path to upload
-            destination_blob_name: Destination path in bucket
-            content_type: MIME type of the file
-            make_public: Whether to make the file publicly accessible
+            file_content: Image file bytes
+            destination_path: Path in GCS bucket (e.g., 'profile/photos/filename.jpg')
+            convert_to_jpeg: Convert image to JPEG format
+            optimize: Optimize image file size
+            quality: JPEG quality (1-100)
 
         Returns:
-            Public URL of the uploaded file
+            Public URL of uploaded file
+
+        Raises:
+            Exception: If upload fails
         """
-        blob = self.bucket.blob(destination_blob_name)
+        try:
+            # Process image if requested
+            if convert_to_jpeg or optimize:
+                image = Image.open(BytesIO(file_content))
 
-        if content_type:
-            blob.content_type = content_type
+                # Convert to RGB if needed (for JPEG)
+                if convert_to_jpeg and image.mode in ('RGBA', 'LA', 'P'):
+                    background = Image.new('RGB', image.size, (255, 255, 255))
+                    if image.mode == 'P':
+                        image = image.convert('RGBA')
+                    background.paste(image, mask=image.split()[-1] if image.mode in ('RGBA', 'LA') else None)
+                    image = background
+                elif convert_to_jpeg and image.mode != 'RGB':
+                    image = image.convert('RGB')
 
-        blob.upload_from_filename(source_file_path)
+                # Save to bytes
+                output = BytesIO()
+                if convert_to_jpeg:
+                    image.save(output, format='JPEG', quality=quality, optimize=optimize)
+                else:
+                    image.save(output, format=image.format, optimize=optimize)
+                file_content = output.getvalue()
 
-        if make_public:
+            # Upload to GCS
+            bucket = self._get_bucket()
+            blob = bucket.blob(destination_path)
+            blob.upload_from_string(
+                file_content,
+                content_type='image/jpeg' if convert_to_jpeg else 'image/png'
+            )
+
+            # Make blob publicly accessible
             blob.make_public()
 
-        return blob.public_url
+            return blob.public_url
 
-    def make_blob_public(self, blob_path: str) -> str:
+        except Exception as e:
+            raise Exception(f"Failed to upload to GCS: {str(e)}")
+
+    async def delete_file(self, file_path: str) -> bool:
         """
-        Make an existing blob publicly accessible.
+        Delete file from GCS.
 
         Args:
-            blob_path: Path to the file in the bucket
+            file_path: Path in GCS bucket
 
         Returns:
-            Public URL of the file
+            True if deleted successfully
         """
-        blob = self.bucket.blob(blob_path)
-        blob.make_public()
-        return blob.public_url
-
-    def list_blobs(self, prefix: Optional[str] = None) -> list[str]:
-        """
-        List all blobs in the bucket with optional prefix filter.
-
-        Args:
-            prefix: Filter blobs by prefix (e.g., 'public/badges/')
-
-        Returns:
-            List of blob names
-        """
-        blobs = self.client.list_blobs(self.bucket_name, prefix=prefix)
-        return [blob.name for blob in blobs]
+        try:
+            bucket = self._get_bucket()
+            blob = bucket.blob(file_path)
+            blob.delete()
+            return True
+        except Exception:
+            return False
 
 
-# Singleton instance
-_gcs_instance: Optional[GoogleCloudStorage] = None
-
-
-def get_gcs() -> GoogleCloudStorage:
-    """Get or create GoogleCloudStorage singleton instance."""
-    global _gcs_instance
-    if _gcs_instance is None:
-        _gcs_instance = GoogleCloudStorage()
-    return _gcs_instance
+# Global instance
+gcs_service = GCSService()

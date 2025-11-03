@@ -1,1 +1,1 @@
-"""Photos module for handling photo uploads."""
+"""Photos module for photo upload and management."""

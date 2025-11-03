@@ -3,7 +3,7 @@ User router - HTTP endpoints for user operations.
 Matches Laravel API routes for backward compatibility.
 """
 from typing import Annotated, Any
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPException
 import stripe
 from stripe import StripeError
 
@@ -13,6 +13,8 @@ from src.geographic.schemas import LaravelResponse
 from src.config import settings
 from src.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
+from src.users.schemas import UserUpdateRequest, PhotoUploadResponse, RoleRequest
+from src.users.service import UserService
 
 router = APIRouter(prefix="/user", tags=["User"])
 
@@ -355,5 +357,178 @@ async def get_stripe_balance(
             success=False,
             data={"error": str(e)},
             message=f"Error retrieving Stripe balance: {str(e)}",
+            code=500
+        )
+
+
+@router.put("/update", response_model=LaravelResponse[Any], status_code=status.HTTP_200_OK)
+async def update_user(
+    request: UserUpdateRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Update user profile information.
+
+    Laravel compatible: PUT /api/user/update
+
+    Args:
+        request: User update data (firstname, lastname, username, phone, date_of_birth)
+
+    Returns:
+        Updated user object
+    """
+    try:
+        service = UserService(db)
+
+        # Update user with provided fields
+        updated_user = await service.update_user(
+            user=current_user,
+            firstname=request.firstname,
+            lastname=request.lastname,
+            username=request.username,
+            phone=request.phone,
+            date_of_birth=request.date_of_birth,
+        )
+
+        # Format response to match Laravel
+        user_data = {
+            "id": updated_user.id,
+            "firstname": updated_user.firstname,
+            "lastname": updated_user.lastname,
+            "username": updated_user.username,
+            "phone": updated_user.phone,
+            "date_of_birth": updated_user.date_of_birth.isoformat() if updated_user.date_of_birth else None,
+            "email": updated_user.email,
+            "created_at": updated_user.created_at.isoformat(),
+            "updated_at": updated_user.updated_at.isoformat(),
+        }
+
+        return LaravelResponse(
+            success=True,
+            data=user_data,
+            message="User updated successfully.",
+            code=200
+        )
+
+    except HTTPException as e:
+        # Re-raise validation errors
+        raise e
+    except Exception as e:
+        return LaravelResponse(
+            success=False,
+            data={"error": str(e)},
+            message="Failed to update user.",
+            code=500
+        )
+
+
+@router.post("/update-photo", response_model=LaravelResponse[PhotoUploadResponse], status_code=status.HTTP_200_OK)
+async def update_photo(
+    photo: Annotated[UploadFile, File(...)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Update user profile photo.
+
+    Laravel compatible: POST /api/user/update-photo
+
+    Args:
+        photo: Image file (jpeg, png, jpg, gif, heic, heif - max 5MB)
+
+    Returns:
+        Photo URL
+    """
+    try:
+        # Validate file type
+        allowed_types = ["image/jpeg", "image/png", "image/jpg", "image/gif", "image/heic", "image/heif"]
+        if photo.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "message": "The photo must be a file of type: jpeg, png, jpg, gif, heic, heif.",
+                    "errors": {"photo": ["The photo must be a file of type: jpeg, png, jpg, gif, heic, heif."]}
+                }
+            )
+
+        # Validate file size (5MB = 5120 KB)
+        content = await photo.read()
+        await photo.seek(0)  # Reset file pointer
+        if len(content) > 5120 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "message": "The photo must not be greater than 5120 kilobytes.",
+                    "errors": {"photo": ["The photo must not be greater than 5120 kilobytes."]}
+                }
+            )
+
+        service = UserService(db)
+        photo_url = await service.update_photo(current_user, photo)
+
+        return LaravelResponse(
+            success=True,
+            data={"photo_url": photo_url},
+            message="Photo updated successfully.",
+            code=200
+        )
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        return LaravelResponse(
+            success=False,
+            data={"error": str(e)},
+            message="Failed to update photo.",
+            code=500
+        )
+
+
+@router.post("/set-role", response_model=LaravelResponse[str], status_code=status.HTTP_200_OK)
+async def set_role(
+    request: RoleRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Set user role (one-time operation).
+
+    Laravel compatible: POST /api/user/set-role
+
+    Args:
+        request: Role data (user or studio_owner)
+
+    Returns:
+        Role name
+
+    Note:
+        This can only be called once per user. After role is set, subsequent calls will return 409 Conflict.
+    """
+    try:
+        service = UserService(db)
+        role_name = await service.set_role(current_user, request.role)
+
+        return LaravelResponse(
+            success=True,
+            data=role_name,
+            message="Role updated successfully.",
+            code=200
+        )
+
+    except HTTPException as e:
+        if e.status_code == status.HTTP_409_CONFLICT:
+            return LaravelResponse(
+                success=False,
+                data=None,
+                message="User already has a role.",
+                code=409
+            )
+        raise e
+    except Exception as e:
+        return LaravelResponse(
+            success=False,
+            data={"error": str(e)},
+            message="Failed to update role.",
             code=500
         )

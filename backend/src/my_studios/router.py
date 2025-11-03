@@ -47,6 +47,33 @@ async def get_my_cities(
     }
 
 
+@router.get(
+    "/",
+    summary="Get all user's studios (simple)",
+    description="Laravel-compatible GET endpoint to retrieve all user studios with full relationships.",
+)
+async def get_my_studios_simple(
+    service: Annotated[MyStudiosService, Depends(get_my_studios_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Get all user's studios with full data (Laravel-compatible).
+
+    Laravel: GET /api/my-studios
+
+    Returns complete studio data with company, badges, rooms, photos, prices, operating hours.
+    """
+    studios = await service.get_user_studios(current_user.id, city_id=None)
+    studios_data = [StudioResponse.model_validate(studio).model_dump() for studio in studios]
+
+    return {
+        "success": True,
+        "data": studios_data,
+        "message": "Studios retrieved successfully.",
+        "code": 200
+    }
+
+
 @router.post(
     "/filter",
     summary="Filter user's studios",

@@ -207,8 +207,10 @@ app.include_router(user_router, prefix=settings.api_prefix)
 
 # Address router
 from src.addresses.router import router as addresses_router, address_router, map_router
+from src.addresses.laravel_endpoints import address_laravel_router
 app.include_router(addresses_router, prefix=settings.api_prefix)
 app.include_router(address_router, prefix=settings.api_prefix)
+app.include_router(address_laravel_router, prefix=settings.api_prefix)  # Laravel-compatible address endpoints
 app.include_router(map_router, prefix=settings.api_prefix)
 
 # Geographic router
@@ -222,8 +224,10 @@ app.include_router(brand_router, prefix=settings.api_prefix)  # Brand creation (
 
 # Room router
 from src.rooms.router import router as rooms_router, room_router
+from src.photos.router import router as photos_router
 app.include_router(rooms_router, prefix=settings.api_prefix)
 app.include_router(room_router, prefix=settings.api_prefix)  # Laravel-compatible singular /room routes
+app.include_router(photos_router, prefix=settings.api_prefix)  # Photo upload management
 
 # Operating Hours router
 from src.operating_hours.router import router as operating_hours_router
@@ -245,16 +249,17 @@ app.include_router(my_studios_router, prefix=settings.api_prefix)
 from src.badges.router import router as badges_router
 app.include_router(badges_router, prefix=settings.api_prefix)
 
-# Photos router
-from src.photos.router import router as photos_router
-app.include_router(photos_router, prefix=settings.api_prefix)
+# Team management router
+from src.teams.router import router as teams_router
+app.include_router(teams_router, prefix=settings.api_prefix)
 
-# TODO: Register additional routers as they are implemented
+# Menu router
+from src.menu.router import router as menu_router
+app.include_router(menu_router, prefix=settings.api_prefix)
+
+# TODO: Register messages router when implemented
 # from src.messages.router import router as messages_router
-# from src.teams.router import router as teams_router
-
 # app.include_router(messages_router, prefix=settings.api_prefix)
-# app.include_router(teams_router, prefix=settings.api_prefix)
 
 
 if __name__ == "__main__":

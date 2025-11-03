@@ -66,7 +66,9 @@ class Settings(BaseSettings):
     aws_bucket_name: str = ""
 
     # Google Cloud Storage
-    gcs_bucket_name: str = "fh-cloud-bucket"
+    gcs_bucket_name: str = ""
+    gcs_project_id: str = ""
+    gcs_credentials_path: Optional[str] = None  # Path to service account JSON
 
     # Email - SendGrid Only
     mail_from_address: str = "mail@funny-how.com"

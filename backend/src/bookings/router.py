@@ -12,7 +12,10 @@ from src.bookings.schemas import (
     CalculatePriceRequest,
     CalculatePriceResponse,
     CreateReservationRequest,
-    CreateReservationResponse
+    CreateReservationResponse,
+    CancelBookingRequest,
+    FilterBookingHistoryRequest,
+    PaginatedBookingsResponse
 )
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
@@ -193,3 +196,179 @@ async def create_room_reservation(
         total_price=result["total_price"],
         expires_at=result["expires_at"]
     )
+
+
+@router.post(
+    "/room/cancel-booking",
+    status_code=status.HTTP_200_OK,
+    summary="Cancel booking with refund",
+    description="Cancel a paid booking (must be 6+ hours before start time)."
+)
+async def cancel_booking(
+    request: Annotated[CancelBookingRequest, Body()],
+    service: Annotated[BookingService, Depends(get_booking_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Cancel a booking with automatic refund.
+
+    Laravel compatible: POST /api/room/cancel-booking
+
+    **Business Rules:**
+    - Must be at least 6 hours before booking start
+    - Only paid bookings (status_id=2) can be cancelled
+    - Refund is processed automatically
+    - Booking status updated to cancelled (status_id=3)
+    """
+    from src.bookings.booking_management_service import BookingManagementService
+    from src.bookings.repository import BookingRepository
+
+    repository = BookingRepository(service._repository._session)
+    management_service = BookingManagementService(repository)
+
+    try:
+        result = await management_service.cancel_booking(
+            booking_id=request.booking_id,
+            user_id=current_user.id
+        )
+
+        return {
+            "success": True,
+            "data": {
+                "booking": result["booking"],
+                "refund": result["refund"]
+            },
+            "message": "Booking cancelled successfully.",
+            "code": 200
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "data": {"error": str(e)},
+            "message": str(e),
+            "code": 400 if "Cannot cancel" in str(e) or "not authorized" in str(e) else 500
+        }
+
+
+@router.post(
+    "/booking-management/filter",
+    status_code=status.HTTP_200_OK,
+    summary="Filter future bookings",
+    description="Get paginated list of future bookings with optional filters."
+)
+async def filter_future_bookings(
+    service: Annotated[BookingService, Depends(get_booking_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    request: Annotated[FilterBookingHistoryRequest, Body()],
+    page: Annotated[int, Query(ge=1)] = 1,
+):
+    """
+    Filter and paginate future bookings.
+
+    Laravel compatible: POST /api/booking-management/filter?page={page}
+
+    **Query Parameters:**
+    - page: Page number (default: 1)
+
+    **Request Body:**
+    - status: Filter by status name (optional)
+    - date: Filter by specific date (optional)
+    - time: Filter by time (bookings active at this time) (optional)
+    - search: Search company name or address street (optional)
+
+    **Returns:**
+    - Paginated list of bookings with relationships
+    - Shows user's bookings AND bookings at studios they own
+    """
+    from src.bookings.booking_management_service import BookingManagementService
+    from src.bookings.repository import BookingRepository
+
+    repository = BookingRepository(service._repository._session)
+    management_service = BookingManagementService(repository)
+
+    try:
+        result = await management_service.filter_bookings(
+            user_id=current_user.id,
+            status=request.status,
+            date=request.date,
+            time=request.time,
+            search=request.search,
+            page=page,
+            per_page=15
+        )
+
+        return {
+            "success": True,
+            "data": result,
+            "message": "Filtered bookings retrieved successfully.",
+            "code": 200
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "data": {"error": str(e)},
+            "message": str(e),
+            "code": 500
+        }
+
+
+@router.post(
+    "/history/filter",
+    status_code=status.HTTP_200_OK,
+    summary="Filter booking history",
+    description="Get paginated list of past bookings with optional filters."
+)
+async def filter_booking_history(
+    service: Annotated[BookingService, Depends(get_booking_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    request: Annotated[FilterBookingHistoryRequest, Body()],
+    page: Annotated[int, Query(ge=1)] = 1,
+):
+    """
+    Filter and paginate past bookings (history).
+
+    Laravel compatible: POST /api/history/filter?page={page}
+
+    **Query Parameters:**
+    - page: Page number (default: 1)
+
+    **Request Body:**
+    - status: Filter by status name (optional)
+    - date: Filter by specific date (optional)
+    - time: Filter by time (bookings active at this time) (optional)
+    - search: Search company name or address street (optional)
+
+    **Returns:**
+    - Paginated list of past bookings with relationships
+    - Shows user's bookings AND bookings at studios they own
+    """
+    from src.bookings.booking_management_service import BookingManagementService
+    from src.bookings.repository import BookingRepository
+
+    repository = BookingRepository(service._repository._session)
+    management_service = BookingManagementService(repository)
+
+    try:
+        result = await management_service.filter_history(
+            user_id=current_user.id,
+            status=request.status,
+            date=request.date,
+            time=request.time,
+            search=request.search,
+            page=page,
+            per_page=15
+        )
+
+        return {
+            "success": True,
+            "data": result,
+            "message": "Booking history retrieved successfully.",
+            "code": 200
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "data": {"error": str(e)},
+            "message": str(e),
+            "code": 500
+        }
