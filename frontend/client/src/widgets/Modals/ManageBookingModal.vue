@@ -49,7 +49,7 @@ const getFirstPhoto = computed(() => {
   if (!props.booking.room.photos || !props.booking.room.photos.length) {
     return ""
   }
-  return props.booking.room.photos[0].url
+  return props.booking.room.photos[0].path
 })
 </script>
 

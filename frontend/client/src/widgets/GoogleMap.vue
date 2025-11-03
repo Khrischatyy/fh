@@ -37,20 +37,37 @@ const zoom = ref(15)
 const studios = ref([])
 
 const updateStudios = (markers) => {
-  studios.value = markers.map((studio) => ({
-    id: studio.id,
-    name: studio.company.name,
-    lat: parseFloat(studio.latitude),
-    lng: parseFloat(studio.longitude),
-    street: studio.street,
-    price: studio.prices.length > 0 ? studio.prices[0].total_price : "N/A",
-    operatingHours:
-      studio.operating_hours.length > 0
-        ? `${studio.operating_hours[0].open_time} - ${studio.operating_hours[0].close_time}`
-        : "N/A",
-    photos: studio.photos.length > 0 ? studio.photos[0].url : "",
-    url: `/@${studio?.slug}`,
-  }))
+  studios.value = markers.map((studio) => {
+    // Get first room's data
+    const firstRoom = studio.rooms && studio.rooms.length > 0 ? studio.rooms[0] : null
+
+    // Get first photo from first room
+    let photoPath = ""
+    if (firstRoom && firstRoom.photos && firstRoom.photos.length > 0) {
+      photoPath = firstRoom.photos[0].path
+    }
+
+    // Get first price from first room
+    let price = "N/A"
+    if (firstRoom && firstRoom.prices && firstRoom.prices.length > 0) {
+      price = firstRoom.prices[0].total_price
+    }
+
+    return {
+      id: studio.id,
+      name: studio.company?.name || studio.name,
+      lat: parseFloat(studio.latitude),
+      lng: parseFloat(studio.longitude),
+      street: studio.street,
+      price: price,
+      operatingHours:
+        studio.operating_hours && studio.operating_hours.length > 0
+          ? `${studio.operating_hours[0].open_time} - ${studio.operating_hours[0].close_time}`
+          : "N/A",
+      photos: photoPath,
+      url: `/@${studio?.slug}`,
+    }
+  })
 }
 
 function mapFitBounds(mapRef, markers) {

@@ -18,6 +18,7 @@ from src.addresses.schemas import (
     AddEquipmentRequest,
     BadgeResponse,
     AddBadgeRequest,
+    MapStudioResponse,
 )
 from src.addresses.service import AddressService
 from src.auth.dependencies import get_current_user
@@ -665,3 +666,103 @@ async def get_address_equipment_laravel(
         "message": "Equipment retrieved successfully",
         "code": 200
     }
+
+
+# Map router - for map view endpoints
+map_router = APIRouter(prefix="/map", tags=["Map"])
+
+
+@map_router.get(
+    "/studios",
+    response_model=list[MapStudioResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Get all studios for map view",
+    description="Returns all studios with complete data for displaying on map.",
+)
+async def get_map_studios(
+    service: Annotated[AddressService, Depends(get_address_service)],
+) -> list[MapStudioResponse]:
+    """
+    Get all studios/addresses for map display.
+
+    Matches Laravel: GET /api/map/studios
+
+    Returns all studios with:
+    - Basic address info (location, name, etc.)
+    - Badges/amenities
+    - Rooms with photos and prices
+    - Company info with logo and user_id
+    - Operating hours
+
+    Used for displaying studios on interactive map.
+    """
+    studios = await service.get_all_studios_for_map()
+
+    # Convert to response format
+    response_studios = []
+    for studio in studios:
+        # Build company data with user_id
+        company_data = None
+        if studio.company:
+            company_data = {
+                "id": studio.company.id,
+                "name": studio.company.name,
+                "slug": studio.company.slug,
+                "logo": studio.company.logo,
+                "logo_url": None,  # TODO: Add S3 URL generation when S3 is configured
+                "user_id": None,
+            }
+
+            # Extract user_id from admin_companies relationship
+            if studio.company.admin_companies:
+                for admin_comp in studio.company.admin_companies:
+                    if admin_comp.admin:
+                        company_data["user_id"] = admin_comp.admin.id
+                        break
+
+        # Convert operating hours to dict format with string times
+        operating_hours_data = []
+        for oh in studio.operating_hours:
+            operating_hours_data.append({
+                "id": oh.id,
+                "mode_id": oh.mode_id,
+                "day_of_week": oh.day_of_week,
+                "open_time": oh.open_time.isoformat() if oh.open_time else None,
+                "close_time": oh.close_time.isoformat() if oh.close_time else None,
+                "is_closed": oh.is_closed,
+            })
+
+        # Calculate is_complete (matching Laravel getIsCompleteAttribute)
+        has_operating_hours = len(studio.operating_hours) > 0
+        has_payment_gateway = False
+        if studio.company and studio.company.admin_companies:
+            for admin_comp in studio.company.admin_companies:
+                if admin_comp.admin:
+                    has_stripe = admin_comp.admin.stripe_account_id is not None
+                    has_square = admin_comp.admin.payment_gateway == 'square'
+                    has_payment_gateway = has_stripe or has_square
+                    break
+
+        # Build studio response
+        studio_dict = {
+            "id": studio.id,
+            "street": studio.street,
+            "city_id": studio.city_id,
+            "company_id": studio.company_id,
+            "latitude": studio.latitude,
+            "longitude": studio.longitude,
+            "slug": studio.slug,
+            "name": studio.name,
+            "timezone": studio.timezone,
+            "badges": studio.badges,
+            "rooms": studio.rooms,
+            "company": company_data,
+            "operating_hours": operating_hours_data,
+            "is_complete": has_operating_hours and has_payment_gateway,
+            "created_at": studio.created_at,
+            "updated_at": studio.updated_at,
+        }
+
+        response_studios.append(MapStudioResponse.model_validate(studio_dict))
+
+    return response_studios

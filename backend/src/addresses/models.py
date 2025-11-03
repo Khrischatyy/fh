@@ -54,7 +54,14 @@ class Address(Base, IDMixin, TimestampMixin):
     __tablename__ = "addresses"
 
     # Basic info
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cover_photo: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+    # Status flags
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_published: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Location
     street: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)

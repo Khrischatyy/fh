@@ -130,3 +130,81 @@ class BadgeResponse(BaseModel):
 class AddBadgeRequest(BaseModel):
     """Request to add badges to an address."""
     badge_ids: list[int] = Field(..., min_length=1, description="List of badge IDs to add")
+
+
+# Map Schemas - for displaying studios on map
+
+class MapRoomPriceResponse(BaseModel):
+    """Room price for map view."""
+    hours: int
+    total_price: Decimal
+    price_per_hour: Decimal
+    is_enabled: bool
+
+    model_config = {"from_attributes": True}
+
+
+class MapRoomPhotoResponse(BaseModel):
+    """Room photo for map view."""
+    id: int
+    path: str
+    index: int
+
+    model_config = {"from_attributes": True}
+
+
+class MapRoomResponse(BaseModel):
+    """Room for map view."""
+    id: int
+    name: Optional[str]
+    address_id: int
+    photos: list[MapRoomPhotoResponse] = []
+    prices: list[MapRoomPriceResponse] = []
+
+    model_config = {"from_attributes": True}
+
+
+class MapCompanyResponse(BaseModel):
+    """Company for map view."""
+    id: int
+    name: str
+    slug: str
+    logo: Optional[str]
+    logo_url: Optional[str] = None
+    user_id: Optional[int] = None
+
+    model_config = {"from_attributes": True}
+
+
+class MapOperatingHourResponse(BaseModel):
+    """Operating hours for map view."""
+    id: int
+    mode_id: Optional[int]
+    day_of_week: Optional[int]
+    open_time: Optional[str] = None
+    close_time: Optional[str] = None
+    is_closed: bool = False
+
+    model_config = {"from_attributes": True}
+
+
+class MapStudioResponse(BaseModel):
+    """Studio/address for map view with all related data."""
+    id: int
+    street: str
+    city_id: int
+    company_id: int
+    latitude: Optional[Decimal]
+    longitude: Optional[Decimal]
+    slug: str
+    name: str
+    timezone: Optional[str]
+    badges: list[BadgeResponse] = []
+    rooms: list[MapRoomResponse] = []
+    company: MapCompanyResponse
+    operating_hours: list[MapOperatingHourResponse] = []
+    is_complete: bool = False
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

@@ -154,3 +154,27 @@ class AddressRepository:
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_all_studios(self) -> list[Address]:
+        """
+        Retrieve all studios/addresses with all relationships for map view.
+
+        Matches Laravel: getAllStudios
+        Loads: badges, rooms, rooms.photos, rooms.prices, company, company.adminCompany.admin, operatingHours
+        """
+        from src.rooms.models import Room
+        from src.companies.models import Company, AdminCompany
+
+        stmt = (
+            select(Address)
+            .options(
+                selectinload(Address.badges),
+                selectinload(Address.rooms).selectinload(Room.photos),
+                selectinload(Address.rooms).selectinload(Room.prices),
+                selectinload(Address.company).selectinload(Company.admin_companies).selectinload(AdminCompany.admin),
+                selectinload(Address.operating_hours),
+            )
+            .order_by(Address.created_at.desc())
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())

@@ -24,9 +24,14 @@ onMounted(async () => {
   })
   try {
     const response = await getStudios()
-    studios.value = response.data.filter((studio) => studio.is_complete)
+    // FastAPI returns array directly, not {data: [...]}
+    // Filter only complete studios (with operating hours and payment gateway)
+    studios.value = Array.isArray(response)
+      ? response.filter((studio) => studio.is_complete)
+      : []
   } catch (error) {
     console.error('Failed to fetch studios:', error)
+    studios.value = []
   } finally {
     isLoading.value = false
   }
@@ -45,8 +50,8 @@ onMounted(async () => {
     <ClientOnly>
       <div v-if="!isLoading">
         <GoogleMap
-          :lat="34.0199732"
-          :lng="-118.266289"
+          lat="34.0199732"
+          lng="-118.266289"
           :markers="studios"
         />
       </div>

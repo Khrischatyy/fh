@@ -230,3 +230,12 @@ class AddressService:
                 complete_addresses.append(address)
 
         return complete_addresses
+
+    async def get_all_studios_for_map(self) -> list[Address]:
+        """
+        Get all studios/addresses for map display.
+
+        Matches Laravel: getAllStudios
+        Returns all addresses with all relationships loaded.
+        """
+        return await self._repository.get_all_studios()

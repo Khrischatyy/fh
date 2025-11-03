@@ -199,9 +199,10 @@ from src.users.router import router as user_router
 app.include_router(user_router, prefix=settings.api_prefix)
 
 # Address router
-from src.addresses.router import router as addresses_router, address_router
+from src.addresses.router import router as addresses_router, address_router, map_router
 app.include_router(addresses_router, prefix=settings.api_prefix)
 app.include_router(address_router, prefix=settings.api_prefix)
+app.include_router(map_router, prefix=settings.api_prefix)
 
 # Geographic router
 from src.geographic.router import router as geographic_router
