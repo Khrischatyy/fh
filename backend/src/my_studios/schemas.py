@@ -77,6 +77,12 @@ class RoomPhotoResponse(BaseModel):
     path: str
     index: int
 
+    @computed_field
+    @property
+    def url(self) -> str:
+        """Generate proxy URL for the photo."""
+        return f"/api/photos/image/{self.path}"
+
     class Config:
         from_attributes = True
 

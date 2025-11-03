@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     aws_region: str = "us-east-1"
     aws_bucket_name: str = ""
 
+    # Google Cloud Storage
+    gcs_bucket_name: str = "fh-cloud-bucket"
+
     # Email - SendGrid Only
     mail_from_address: str = "mail@funny-how.com"
     mail_from_name: str = "Funny How"

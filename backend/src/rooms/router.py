@@ -233,7 +233,90 @@ async def delete_photo(
     await service.delete_photo(photo_id)
 
 
-# Laravel-compatible price endpoint
+# Laravel-compatible endpoints
+@room_router.post(
+    "/add-room",
+    summary="Create room (Laravel-compatible)",
+    description="Laravel-compatible endpoint to create a new room.",
+    status_code=status.HTTP_201_CREATED
+)
+async def add_room_laravel(
+    data: dict,
+    service: Annotated[RoomService, Depends(get_room_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Create a new room (Laravel-compatible route).
+
+    This endpoint matches Laravel's URL pattern: POST /api/room/add-room
+
+    Request body:
+    {
+        "name": "Room name",
+        "address_id": 17
+    }
+    """
+    # Create RoomCreate schema from dict
+    room_data = RoomCreate(
+        name=data.get("name"),
+        address_id=data.get("address_id")
+    )
+
+    room = await service.create_room(room_data)
+    room_dict = RoomResponse.model_validate(room).model_dump()
+
+    # Return Laravel-compatible format
+    return {
+        "success": True,
+        "data": room_dict,
+        "message": "Room created successfully",
+        "code": 201
+    }
+
+
+@room_router.post(
+    "/{room_id}/prices",
+    summary="Create room price (Laravel-compatible)",
+    description="Laravel-compatible endpoint to create a new price tier for a room.",
+    status_code=status.HTTP_201_CREATED
+)
+async def create_room_price_laravel(
+    room_id: int,
+    data: dict,
+    service: Annotated[RoomService, Depends(get_room_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Create a new price tier for a room (Laravel-compatible route).
+
+    This endpoint matches Laravel's URL pattern: POST /api/room/{room_id}/prices
+
+    Request body:
+    {
+        "total_price": 60,
+        "hours": 1,
+        "is_enabled": true
+    }
+    """
+    # Create RoomPriceCreate schema from dict
+    price_data = RoomPriceCreate(
+        total_price=data.get("total_price"),
+        hours=data.get("hours"),
+        is_enabled=data.get("is_enabled", True)
+    )
+
+    price = await service.create_price(room_id, price_data)
+    price_dict = RoomPriceResponse.model_validate(price).model_dump()
+
+    # Return Laravel-compatible format
+    return {
+        "success": True,
+        "data": price_dict,
+        "message": "Room price created successfully",
+        "code": 201
+    }
+
+
 @room_router.get(
     "/{room_id}/prices",
     summary="Get room prices (Laravel-compatible)",

@@ -579,6 +579,50 @@ async def set_operating_hours_laravel(
 
 
 # Laravel-compatible badges endpoints
+@address_router.post(
+    "/{address_id}/badge",
+    summary="Toggle badge for address (Laravel-compatible)",
+    description="Laravel-compatible endpoint to toggle a badge for an address.",
+)
+async def toggle_badge_laravel(
+    address_id: int,
+    data: dict,
+    service: Annotated[AddressService, Depends(get_address_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Toggle a badge for an address (Laravel-compatible route).
+
+    This endpoint matches Laravel's URL pattern: POST /api/address/{address_id}/badge
+    If badge is already assigned, it removes it. Otherwise, it adds it.
+    """
+    badge_id = int(data.get("badge_id"))
+
+    # Get the address with badges
+    address = await service.get_address(address_id)
+
+    # Check if badge is already assigned
+    current_badge_ids = [badge.id for badge in address.badges]
+
+    if badge_id in current_badge_ids:
+        # Remove the badge
+        current_badge_ids.remove(badge_id)
+    else:
+        # Add the badge
+        current_badge_ids.append(badge_id)
+
+    # Update badges
+    badges = await service.add_badges(address_id, current_badge_ids)
+
+    # Return Laravel-compatible format with just the taken badge IDs
+    return {
+        "success": True,
+        "data": current_badge_ids,
+        "message": "Badge updated successfully",
+        "code": 200
+    }
+
+
 @address_router.get(
     "/{address_id}/badges",
     summary="Get all available badges (Laravel-compatible)",
@@ -597,6 +641,7 @@ async def get_all_badges_laravel(
     from src.addresses.models import Badge
     from sqlalchemy import select
     from src.database import AsyncSessionLocal
+    from src.gcs_utils import get_public_url
 
     async with AsyncSessionLocal() as session:
         # Get all badges from the database
@@ -604,12 +649,26 @@ async def get_all_badges_laravel(
         result = await session.execute(stmt)
         badges = list(result.scalars().all())
 
-        badges_data = [BadgeResponse.model_validate(badge).model_dump() for badge in badges]
+        # Get the address to retrieve taken badges
+        address = await service.get_address(address_id)
 
-        # Return Laravel-compatible format
+        badges_data = []
+        taken_badge_ids = [badge.id for badge in address.badges]
+
+        for badge in badges:
+            badge_dict = BadgeResponse.model_validate(badge).model_dump()
+            # Convert GCS path to full public URL (no credentials needed)
+            if badge.image:
+                badge_dict["image"] = get_public_url(badge.image)
+            badges_data.append(badge_dict)
+
+        # Return Laravel-compatible format with all_badges and taken_badges
         return {
             "success": True,
-            "data": badges_data,
+            "data": {
+                "all_badges": badges_data,
+                "taken_badges": taken_badge_ids
+            },
             "message": "Badges retrieved successfully",
             "code": 200
         }

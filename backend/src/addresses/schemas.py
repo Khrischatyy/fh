@@ -119,7 +119,8 @@ class BadgeResponse(BaseModel):
     """Badge/amenity response schema."""
     id: int
     name: str
-    icon: Optional[str] = None
+    image: Optional[str] = None  # GCS path
+    description: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

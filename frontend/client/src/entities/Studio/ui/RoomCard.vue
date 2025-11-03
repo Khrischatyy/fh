@@ -36,7 +36,7 @@
     </div>
 
     <div
-        :style="`background: url(${displayedPhotos[currentIndex]?.path}) rgb(33 33 33) no-repeat center center / cover;`"
+        :style="`background: url(${displayedPhotos[currentIndex]?.url || displayedPhotos[currentIndex]?.path}) rgb(33 33 33) no-repeat center center / cover;`"
         class="flex flex-col gap-1 h-full w-full justify-center items-center absolute top-0 left-0 rounded-md cursor-pointer">
       <div v-if="displayedPhotos.length === 0" class="flex flex-col items-center justify-center">
         <IconPhotoPlaceholder class="h-[50px] sm:h-[100px]" />

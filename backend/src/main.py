@@ -234,6 +234,14 @@ app.include_router(payments_router, prefix=settings.api_prefix)
 from src.my_studios.router import router as my_studios_router
 app.include_router(my_studios_router, prefix=settings.api_prefix)
 
+# Badges router
+from src.badges.router import router as badges_router
+app.include_router(badges_router, prefix=settings.api_prefix)
+
+# Photos router
+from src.photos.router import router as photos_router
+app.include_router(photos_router, prefix=settings.api_prefix)
+
 # TODO: Register additional routers as they are implemented
 # from src.messages.router import router as messages_router
 # from src.teams.router import router as teams_router

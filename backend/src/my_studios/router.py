@@ -93,7 +93,8 @@ async def filter_my_studios(
                 "id": photo.id,
                 "room_id": photo.room_id,
                 "path": photo.path,
-                "index": photo.index
+                "index": photo.index,
+                "url": f"/api/photos/image/{photo.path}"  # Add proxy URL
             }
             for photo in all_photos
         ]

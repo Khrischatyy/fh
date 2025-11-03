@@ -132,9 +132,10 @@ const handleFile = async (files: FileList) => {
   formData.append("room_id", props.room.id.toString())
   try {
     const response = await uploadPhoto(formData)
-    studioForm.photos = response.data
+    studioForm.photos = response.data.photos
       .map((photo) => ({
-        url: photo.path,
+        url: photo.url,  // Use photo.url from backend response
+        path: photo.path,
         id: photo.id,
         index: photo.index,
         file: null,
@@ -158,7 +159,8 @@ const updatePhotos = () => {
   if (!props.room) return
   studioForm.photos = props.room.photos
     .map((photo) => ({
-      url: photo.path,
+      url: photo.url || photo.path,  // Prefer url, fallback to path
+      path: photo.path,
       id: photo.id,
       index: photo.index,
       file: null,
@@ -194,7 +196,8 @@ watch(
     if (!newVal) return
     studioForm.photos = props.room.photos
       .map((photo) => ({
-        url: photo.url,
+        url: photo.url || photo.path,  // Prefer url, fallback to path
+        path: photo.path,
         id: photo.id,
         index: photo.index,
         file: null,

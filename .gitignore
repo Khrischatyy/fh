@@ -140,6 +140,10 @@ static/uploads/
 laravel
 .claude
 
+# Google Cloud credentials
+*.json
+!backend/alembic.ini
+
 # Docker
 *.env.local
 docker-compose.override.yml

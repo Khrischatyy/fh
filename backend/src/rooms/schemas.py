@@ -4,7 +4,7 @@ Room schemas - API contracts for rooms, pricing, and photos.
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, computed_field
 
 
 # Room Schemas
@@ -12,7 +12,6 @@ from pydantic import BaseModel, Field, field_validator
 class RoomBase(BaseModel):
     """Base room schema."""
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
 
 
 class RoomCreate(RoomBase):
@@ -30,8 +29,6 @@ class RoomCreate(RoomBase):
 class RoomUpdate(BaseModel):
     """Schema for updating a room."""
     name: Optional[str] = Field(None, min_length=1, max_length=255)
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
 
     @field_validator("name")
     @classmethod
@@ -45,7 +42,6 @@ class RoomResponse(RoomBase):
     """Room response schema."""
     id: int
     address_id: int
-    is_active: bool
     created_at: datetime
     updated_at: datetime
 
@@ -99,7 +95,7 @@ class RoomPriceResponse(RoomPriceBase):
 
 class RoomPhotoBase(BaseModel):
     """Base room photo schema."""
-    photo_path: str = Field(..., min_length=1, max_length=500)
+    path: str = Field(..., min_length=1, max_length=500, serialization_alias="path")
     index: int = Field(default=0, ge=0, description="Photo order index")
 
 
@@ -115,11 +111,15 @@ class RoomPhotoUpdate(BaseModel):
 
 
 class RoomPhotoResponse(RoomPhotoBase):
-    """Room photo response schema."""
+    """Room photo response schema with computed URL."""
     id: int
     room_id: int
-    created_at: datetime
-    updated_at: datetime
+
+    @computed_field
+    @property
+    def url(self) -> str:
+        """Generate proxy URL for the photo."""
+        return f"/api/photos/image/{self.path}"
 
     class Config:
         from_attributes = True

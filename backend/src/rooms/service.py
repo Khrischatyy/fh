@@ -29,13 +29,10 @@ class RoomService:
 
         Business rules:
         - Room must belong to an address
-        - Room starts as active by default
         """
         room = Room(
             name=data.name,
-            description=data.description,
             address_id=data.address_id,
-            is_active=True,
         )
         return await self._repository.create(room)
 
@@ -56,10 +53,6 @@ class RoomService:
 
         if data.name is not None:
             room.name = data.name
-        if data.description is not None:
-            room.description = data.description
-        if data.is_active is not None:
-            room.is_active = data.is_active
 
         return await self._repository.update(room)
 
