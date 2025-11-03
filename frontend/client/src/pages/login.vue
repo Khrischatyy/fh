@@ -18,6 +18,8 @@ import {
 import { useCreateAccount, useLogin } from "~/src/entities/User/api"
 import { FInputClassic } from "~/src/shared/ui/common"
 import GoogleSignInButton from "~/src/shared/ui/components/GoogleSignInButton.vue"
+import PhoneSignInButton from "~/src/shared/ui/components/PhoneSignInButton.vue"
+import PhoneAuthInput from "~/src/features/Auth/phone-login/ui/PhoneAuthInput.vue"
 import { CreateAccountFlow } from "~/src/widgets/CreateAccount"
 
 useHead({
@@ -30,6 +32,7 @@ definePageMeta({
 })
 
 const { loginUser, errors, isLoading, formValues, isError } = useLogin()
+const showPhoneAuth = ref(false)
 
 const {
   formValues: registrationFormValues,
@@ -79,6 +82,16 @@ async function authForm() {
     isLoading.value = false
   }
 }
+
+function handlePhoneAuthSuccess() {
+  showPhoneAuth.value = false
+  // User is now authenticated via session store
+}
+
+function handlePhoneAuthCancel() {
+  showPhoneAuth.value = false
+}
+
 const bookingData = computed(() => {
   if (process.client) {
     return localStorage.getItem("bookingData") || false
@@ -351,10 +364,27 @@ const bookingData = computed(() => {
                     @click="createForm()"
                     class="w-full min-h-11 h-auto p-3.5 hover:opacity-90 rounded-[10px] text-white border text-sm font-medium tracking-wide"
                   >
-                    Don’t have an account? Create account
+                    Don't have an account? Create account
                   </button>
                 </div>
-                <GoogleSignInButton />
+
+                <!-- Auth Options -->
+                <div class="flex flex-col gap-3">
+                  <GoogleSignInButton />
+
+                  <!-- Phone Sign In Button (toggles inline form) -->
+                  <PhoneSignInButton
+                    v-if="!showPhoneAuth"
+                    @click="showPhoneAuth = true"
+                  />
+
+                  <!-- Inline Phone Auth Form -->
+                  <PhoneAuthInput
+                    v-if="showPhoneAuth"
+                    @success="handlePhoneAuthSuccess"
+                    @cancel="handlePhoneAuthCancel"
+                  />
+                </div>
               </div>
               <div
                 class="w-full h-11 p-3.5 justify-center items-center gap-2.5 inline-flex"

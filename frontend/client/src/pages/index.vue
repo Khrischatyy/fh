@@ -4,6 +4,8 @@ import { ref, onMounted, watch } from "vue"
 import { ACCESS_TOKEN_KEY, useSessionStore } from "~/src/entities/Session"
 import { useCookie } from "#app"
 import GoogleSignInButton from "~/src/shared/ui/components/GoogleSignInButton.vue"
+import PhoneSignInButton from "~/src/shared/ui/components/PhoneSignInButton.vue"
+import PhoneAuthInput from "~/src/features/Auth/phone-login/ui/PhoneAuthInput.vue"
 import { Header, Footer } from "~/src/shared/ui/components"
 
 useHead({
@@ -13,6 +15,7 @@ useHead({
 
 const isBrand = ref("")
 const session = useSessionStore()
+const showPhoneAuth = ref(false)
 
 watch(
   () => session.brand,
@@ -27,6 +30,15 @@ onMounted(() => {
 
 function signOut() {
   useSessionStore().logout()
+}
+
+function handlePhoneAuthSuccess() {
+  showPhoneAuth.value = false
+  // User is now authenticated via session store
+}
+
+function handlePhoneAuthCancel() {
+  showPhoneAuth.value = false
 }
 </script>
 
@@ -69,7 +81,26 @@ function signOut() {
           </div>
         </RouterLink>
       </div>
-      <GoogleSignInButton class="mt-10" />
+
+      <!-- Auth Buttons (shown when not authenticated) -->
+      <div v-if="!useCookie(ACCESS_TOKEN_KEY).value" class="flex flex-col items-center gap-3 mt-10">
+        <GoogleSignInButton />
+
+        <!-- Phone Sign In Button (toggles inline form) -->
+        <PhoneSignInButton
+          v-if="!showPhoneAuth"
+          @click="showPhoneAuth = true"
+        />
+
+        <!-- Inline Phone Auth Form -->
+        <PhoneAuthInput
+          v-if="showPhoneAuth"
+          @success="handlePhoneAuthSuccess"
+          @cancel="handlePhoneAuthCancel"
+          class="mt-4"
+        />
+      </div>
+
       <div
         v-if="useCookie(ACCESS_TOKEN_KEY).value"
         class="justify-center w-full max-w-96 p-5 items-center gap-2.5 inline-flex mt-10"

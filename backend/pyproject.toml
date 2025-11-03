@@ -47,6 +47,10 @@ dependencies = [
     "jinja2>=3.1.0",
     "sendgrid>=6.11.0",
 
+    # SMS
+    "twilio>=8.0.0",
+    "phonenumbers>=8.13.0",
+
     # Redis & Caching
     "redis>=5.0.0",
 

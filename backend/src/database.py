@@ -6,6 +6,7 @@ from typing import AsyncGenerator
 from sqlalchemy import create_engine, MetaData
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from redis.asyncio import Redis
 
 from src.config import settings
 
@@ -130,3 +131,40 @@ async def drop_db():
     """Drop all database tables. Use with caution!"""
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+
+
+# Redis client instance
+_redis_client: Redis | None = None
+
+
+async def get_redis() -> AsyncGenerator[Redis, None]:
+    """
+    Dependency for getting async Redis client.
+
+    Usage:
+        @router.post("/send-code")
+        async def send_code(redis: Redis = Depends(get_redis)):
+            ...
+    """
+    global _redis_client
+
+    if _redis_client is None:
+        _redis_client = Redis.from_url(
+            settings.redis_url,
+            encoding="utf-8",
+            decode_responses=True,
+        )
+
+    try:
+        yield _redis_client
+    finally:
+        # Don't close the connection here as it's reused
+        pass
+
+
+async def close_redis():
+    """Close Redis connection. Call on app shutdown."""
+    global _redis_client
+    if _redis_client:
+        await _redis_client.close()
+        _redis_client = None

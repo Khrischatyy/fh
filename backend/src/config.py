@@ -73,6 +73,11 @@ class Settings(BaseSettings):
     mail_from_name: str = "Funny How"
     sendgrid_api_key: str = ""
 
+    # Twilio - SMS Authentication
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_phone_number: str = ""
+
     # Frontend URLs for emails
     frontend_url: str = "https://funny-how.com"
     unsubscribe_url: str = "https://funny-how.com/unsubscribe"

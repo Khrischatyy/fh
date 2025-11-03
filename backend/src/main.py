@@ -34,6 +34,7 @@ from src.payments.models import Charge, Payout, SquareLocation, SquareToken  # n
 
 # Import routers
 from src.auth.router import router as auth_router  # Custom Laravel-compatible auth
+from src.auth.sms_router import router as sms_auth_router  # SMS authentication
 # from src.auth.router_fastapi_users import router as auth_router  # FastAPI Users (disabled)
 
 # Configure logging
@@ -78,6 +79,11 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down application...")
+
+    # Close Redis connection
+    from src.database import close_redis
+    await close_redis()
+    logger.info("Redis connection closed")
 
 
 # Initialize FastAPI app
@@ -193,6 +199,7 @@ async def get_operation_modes():
 
 # Register routers
 app.include_router(auth_router, prefix=settings.api_prefix)
+app.include_router(sms_auth_router, prefix=settings.api_prefix)
 
 # User router
 from src.users.router import router as user_router
