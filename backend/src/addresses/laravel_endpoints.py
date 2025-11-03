@@ -15,6 +15,9 @@ from src.database import get_db
 from src.addresses.models import Address
 from src.companies.models import Company, AdminCompany
 from src.bookings.models import Booking
+from src.companies.repository import CompanyRepository
+from src.companies.service import CompanyService
+from src.exceptions import ForbiddenException
 
 # Laravel-compatible router
 address_laravel_router = APIRouter(prefix="/address", tags=["Address - Laravel"])
@@ -67,8 +70,12 @@ async def update_address_slug(
             "code": 404
         }
 
-    # TODO: Authorization check
-    # Laravel: $this->authorize('update', $address)
+    # Authorization check: verify user is admin of the address's company
+    if address.company_id:
+        company_repo = CompanyRepository(db)
+        company_service = CompanyService(company_repo)
+        if not await company_service.is_admin(address.company_id, current_user.id):
+            raise ForbiddenException("You are not authorized to update this address")
 
     # Check if new slug is already taken
     stmt = select(Address).where(Address.slug == request.new_slug)
@@ -138,8 +145,12 @@ async def delete_address(
             "code": 404
         }
 
-    # TODO: Authorization check
-    # Laravel: $this->authorize('delete', $address)
+    # Authorization check: verify user is admin of the address's company
+    if address.company_id:
+        company_repo = CompanyRepository(db)
+        company_service = CompanyService(company_repo)
+        if not await company_service.is_admin(address.company_id, current_user.id):
+            raise ForbiddenException("You are not authorized to delete this address")
 
     # Delete operating hours
     for oh in address.operating_hours:
@@ -284,8 +295,11 @@ async def get_studio_clients(
             "code": 404
         }
 
-    # TODO: Authorization check
-    # Laravel: authorize user can update company
+    # Authorization check: verify user is admin of the company
+    company_repo = CompanyRepository(db)
+    company_service = CompanyService(company_repo)
+    if not await company_service.is_admin(company.id, current_user.id):
+        raise ForbiddenException("You are not authorized to access this company's clients")
 
     # Get users who have bookings at this company's studios
     # Join: User -> Booking -> Room -> Address -> Company

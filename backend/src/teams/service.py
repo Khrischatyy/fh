@@ -11,6 +11,9 @@ import string
 
 from src.auth.models import User, engineer_addresses
 from src.addresses.models import Address
+from src.companies.repository import CompanyRepository
+from src.companies.service import CompanyService
+from src.exceptions import ForbiddenException
 
 
 class TeamService:
@@ -62,8 +65,12 @@ class TeamService:
                 }
             )
 
-        # TODO: Authorize update permission for this address
-        # In Laravel: $this->authorize('update', $address)
+        # Authorization check: verify user is admin of the address's company
+        if address.company_id:
+            company_repo = CompanyRepository(self.db)
+            company_service = CompanyService(company_repo)
+            if not await company_service.is_admin(address.company_id, current_user_id):
+                raise ForbiddenException("You are not authorized to manage team members for this address")
 
         # Check if email already exists
         stmt = select(User).where(User.email == email)
@@ -174,8 +181,12 @@ class TeamService:
                 }
             )
 
-        # TODO: Authorize update permission
-        # In Laravel: $this->authorize('update', $address)
+        # Authorization check: verify user is admin of the address's company
+        if address.company_id:
+            company_repo = CompanyRepository(self.db)
+            company_service = CompanyService(company_repo)
+            if not await company_service.is_admin(address.company_id, current_user_id):
+                raise ForbiddenException("You are not authorized to manage team members for this address")
 
         # Verify member is attached to this address
         stmt = select(engineer_addresses).where(
