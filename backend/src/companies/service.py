@@ -190,6 +190,7 @@ class CompanyService:
         address_slug = await self._ensure_unique_address_slug(address_slug)
 
         address = Address(
+            name=data.company,  # Use company name as address name
             street=data.street,
             longitude=data.longitude,
             latitude=data.latitude,

@@ -13,6 +13,7 @@
       v-model="formValues.name"
       label="Name"
       type="text"
+      autocomplete="name"
       :error="isError('name')"
     />
     <FInputClassic
@@ -20,6 +21,7 @@
       v-model="formValues.email"
       label="E-mail"
       type="email"
+      autocomplete="email"
       :error="isError('email')"
     />
     <FInputClassic
@@ -27,6 +29,7 @@
       v-model="formValues.password"
       label="Password"
       type="password"
+      autocomplete="new-password"
       :error="isError('password')"
     />
     <FInputClassic
@@ -34,7 +37,8 @@
       v-model="formValues.password_confirmation"
       label="Confirm Password"
       type="password"
-      :error="isError('password')"
+      autocomplete="new-password"
+      :error="isError('password_confirmation')"
     />
     <div class="justify-center items-center gap-2.5 inline-flex w-full">
       <button
