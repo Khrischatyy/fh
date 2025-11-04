@@ -112,7 +112,7 @@ io.on('connection', async (socket) => {
         const senderId = socket.user.id;
         console.log('[chat] Incoming private-message:', { userId: senderId, data });
         try {
-            const apiUrl = 'http://nginx/api/v1/messages';
+            const apiUrl = 'http://nginx/api/messages';
             const apiData = {
                 recipient_id: recipientId,
                 address_id: addressId,
@@ -138,8 +138,8 @@ io.on('connection', async (socket) => {
                 message: savedMessage.content,
                 createdAt: savedMessage.created_at
             };
+            // Only emit to recipient (sender already has the message from API response)
             io.to(`user_${recipientId}`).emit('new-message', messageData);
-            io.to(`user_${senderId}`).emit('new-message', messageData);
         } catch (error) {
             console.error('[chat] Error saving message via API:', error?.response?.data || error.message);
             socket.emit('error', 'Failed to send message');
@@ -150,7 +150,7 @@ io.on('connection', async (socket) => {
     socket.on('get-message-history', async (data) => {
         const { addressId, recipientId } = data;
         try {
-            const apiUrl = 'http://nginx/api/v1/messages/history';
+            const apiUrl = 'http://nginx/api/messages/history';
             const apiHeaders = {
                 Accept: 'application/json',
                 Authorization: `Bearer ${socket.userToken}`

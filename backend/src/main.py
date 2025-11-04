@@ -3,6 +3,7 @@ Main FastAPI application entry point.
 Initializes the app, registers routers, and configures middleware.
 """
 import logging
+import logging.config
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -257,9 +258,9 @@ app.include_router(teams_router, prefix=settings.api_prefix)
 from src.menu.router import router as menu_router
 app.include_router(menu_router, prefix=settings.api_prefix)
 
-# TODO: Register messages router when implemented
-# from src.messages.router import router as messages_router
-# app.include_router(messages_router, prefix=settings.api_prefix)
+# Messages/Chat router
+from src.messages.router import router as messages_router
+app.include_router(messages_router, prefix=settings.api_prefix)
 
 
 if __name__ == "__main__":

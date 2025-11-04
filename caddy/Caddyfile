@@ -31,9 +31,15 @@
         reverse_proxy api:8000
     }
 
-    # Socket.io chat service
+    # Socket.io chat service (WebSocket support)
     handle /socket.io/* {
-        reverse_proxy chat:6001
+        reverse_proxy chat:6001 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Forwarded-Host {host}
+        }
     }
 
     # Frontend (Nuxt) - handle all other requests

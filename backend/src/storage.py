@@ -160,5 +160,4 @@ gcs_service = GCSService()
 
 
 def get_gcs() -> GCSService:
-    """Get global GCS service instance."""
     return gcs_service

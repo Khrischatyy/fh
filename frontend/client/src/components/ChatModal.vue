@@ -76,7 +76,9 @@ const isConnected = ref(true)
 const connectSocket = () => {
   try {
     console.log('[chat] Connecting to WebSocket...')
-    const host = import.meta.env.VITE_WEBSOCKET_HOST || 'http://127.0.0.1:6001'
+    // Use relative URL to connect through Caddy proxy
+    // This works both in dev (localhost) and production
+    const host = import.meta.env.VITE_WEBSOCKET_HOST || window.location.origin
     console.log('[chat] WebSocket host:', host)
     console.log('[chat][debug] sessionStore:', sessionStore)
     console.log('[chat][debug] sessionStore.accessToken:', sessionStore.accessToken)

@@ -217,7 +217,9 @@ const isConnected = ref(false)
 const connectSocket = () => {
   try {
     console.log('[chat] Connecting to WebSocket...')
-    const host = window.location.hostname === 'localhost' ? 'http://localhost:6001' : 'https://funny-how.com'
+    // Use relative URL to connect through Caddy proxy
+    // This works both in dev (localhost) and production
+    const host = window.location.origin
     console.log('[chat] WebSocket host:', host)
     const token = session.value.accessToken
     console.log('[chat] Using token:', token)
@@ -262,8 +264,16 @@ const connectSocket = () => {
 
     socket.value.on('new-message', (message: Message) => {
       console.log('[chat][debug] new-message received:', message)
-      messages.value.push(message)
-      nextTick(() => scrollToBottom())
+
+      // Deduplicate: check if message already exists
+      const exists = messages.value.some(m => m.id === message.id)
+      if (!exists) {
+        messages.value.push(message)
+        console.log('Added new message from Socket.io')
+        nextTick(() => scrollToBottom())
+      } else {
+        console.log('Message already exists, skipping duplicate')
+      }
     })
 
     socket.value.on('message-history', (history: Message[]) => {
@@ -363,36 +373,24 @@ const sendMessage = async () => {
     }
 
     console.log('Sending message data:', messageData)
-    await post(messageData)
 
-    // Also try via socket if connected
-    if (isConnected.value && socket.value) {
-      console.log('[chat][debug] emit private-message', {
-        recipientId: chat.value.customer_id,
-        message: newMessage.value,
-        addressId: chat.value.address_id
-      })
+    // Send via API only (Socket.io server will broadcast to recipient)
+    const response = await post(messageData)
+    console.log('Message sent via API, response:', response)
 
-      socket.value.emit('private-message', {
-        recipientId: chat.value.customer_id,
-        message: newMessage.value,
-        addressId: chat.value.address_id
-      })
+    // Add the sent message to local UI (optimistic update)
+    // Note: We'll also receive it via Socket.io broadcast, so we need deduplication
+    if (response && response.data) {
+      const savedMessage = response.data
+
+      // Check if message already exists (deduplication)
+      const exists = messages.value.some(m => m.id === savedMessage.id)
+      if (!exists) {
+        messages.value.push(savedMessage)
+        console.log('Added sent message to local UI')
+      }
     }
 
-    // Add the message to the local messages list immediately
-    const newMsg: Message = {
-      id: Date.now(), // Temporary ID
-      content: newMessage.value,
-      sender_id: Number(currentUserId.value),
-      recipient_id: chat.value.customer_id,
-      address_id: chat.value.address_id,
-      is_read: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-
-    messages.value.push(newMsg)
     newMessage.value = ''
     nextTick(() => scrollToBottom())
   } catch (err) {

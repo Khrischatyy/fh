@@ -35,6 +35,7 @@ help:
 	@echo "$(BLUE)💾 Database:$(NC)"
 	@echo "  make db-shell          - Open PostgreSQL shell"
 	@echo "  make db-reset          - Reset database (WARNING: destructive)"
+	@echo "  make seed              - Run database seeders (roles, badges)"
 	@echo ""
 	@echo "$(BLUE)🎨 Frontend:$(NC)"
 	@echo "  make npm-install       - Install npm dependencies"
@@ -55,6 +56,7 @@ help:
 	@echo "  make logs-prod-all            - View all production logs"
 	@echo "  make logs-prod-frontend       - View frontend logs"
 	@echo "  make migrate-prod             - Run production migrations"
+	@echo "  make seed-prod                - Run production seeders"
 	@echo "  make health-prod              - Check production health"
 	@echo ""
 	@echo "$(YELLOW)📍 Service URLs:$(NC)"
@@ -190,6 +192,11 @@ db-reset:
 	@docker-compose -f dev.yml exec api alembic downgrade base
 	@docker-compose -f dev.yml exec api alembic upgrade head
 	@echo "$(GREEN)Database reset complete$(NC)"
+
+seed:
+	@echo "$(GREEN)🌱 Running database seeders...$(NC)"
+	@docker-compose -f dev.yml exec api python -m src.db.seed
+	@echo "$(GREEN)✅ Seeders completed!$(NC)"
 
 # ==============================================================================
 # Frontend Commands
@@ -331,6 +338,11 @@ migrate-prod:
 	@docker-compose -f prod.yml exec -T api alembic upgrade head
 	@echo "$(GREEN)✅ Migrations applied successfully!$(NC)"
 
+seed-prod:
+	@echo "$(GREEN)🌱 Running production database seeders...$(NC)"
+	@docker-compose -f prod.yml exec -T api python -m src.db.seed
+	@echo "$(GREEN)✅ Seeders completed!$(NC)"
+
 health-prod:
 	@echo "$(GREEN)Checking production service health...$(NC)"
 	@echo ""
@@ -366,7 +378,7 @@ clean-all:
 # Quick Setup
 # ==============================================================================
 
-setup: dev-build migrate
+setup: dev-build migrate seed
 	@echo ""
 	@echo "$(GREEN)=========================================$(NC)"
 	@echo "$(GREEN)✅ Setup Complete!$(NC)"
