@@ -120,6 +120,27 @@ def check_stripe_payouts_enabled(stripe_account_id: str) -> bool:
         return False
 
 
+def _transform_photo_path(path: str) -> str:
+    """
+    Transform photo path to proxy URL if needed.
+
+    Args:
+        path: Original photo path
+
+    Returns:
+        Transformed path (proxy URL if not already a full URL)
+    """
+    if not path:
+        return path
+
+    # If already a full URL or proxy URL, return as-is
+    if path.startswith('http') or path.startswith('/api/'):
+        return path
+
+    # Convert GCS path to proxy URL
+    return f"/api/photos/image/{path}"
+
+
 def build_studio_dict(
     address: "Address",
     include_is_complete: bool = True,
@@ -140,6 +161,8 @@ def build_studio_dict(
     Returns:
         Dictionary with standardized studio data
     """
+    from src.gcs_utils import get_public_url
+
     if stripe_cache is None:
         stripe_cache = {}
 
@@ -161,7 +184,7 @@ def build_studio_dict(
             {
                 "id": b.id,
                 "name": b.name,
-                "image": getattr(b, 'image', None),
+                "image": get_public_url(b.image) if b.image else None,
                 "description": getattr(b, 'description', None)
             }
             for b in address.badges
@@ -171,7 +194,7 @@ def build_studio_dict(
                 "id": r.id,
                 "name": r.name,
                 "photos": [
-                    {"id": p.id, "path": p.path, "index": p.index}
+                    {"id": p.id, "path": _transform_photo_path(p.path), "index": p.index}
                     for p in r.photos
                 ],
                 "prices": [
@@ -218,7 +241,7 @@ def build_studio_dict(
         all_photos.extend([
             {
                 "id": p.id,
-                "path": p.path,
+                "path": _transform_photo_path(p.path),
                 "index": p.index
             }
             for p in room.photos
