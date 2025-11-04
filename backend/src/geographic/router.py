@@ -86,11 +86,13 @@ async def get_city_studios(
     """
     Retrieve all studios (addresses) in a specific city.
 
+    Only returns studios where the owner has Stripe/Square payouts enabled.
+
     Args:
         city_id: The city ID
 
     Returns:
-        List of complete addresses in the city
+        List of complete addresses in the city with payouts_ready field
 
     Laravel compatible: GET /api/city/{city_id}/studios
 
@@ -100,6 +102,11 @@ async def get_city_studios(
     from src.addresses.repository import AddressRepository
     from src.addresses.service import AddressService
     from src.database import AsyncSessionLocal
+    import stripe
+    from src.config import settings
+
+    # Initialize Stripe
+    stripe.api_key = settings.stripe_api_key
 
     # Create database session
     async with AsyncSessionLocal() as session:
@@ -118,9 +125,46 @@ async def get_city_studios(
                 code=404
             )
 
+        # Cache Stripe account statuses to avoid repeated API calls
+        stripe_statuses = {}
+
         # Convert addresses to dict format for response
         addresses_data = []
         for address in addresses:
+            # Check if studio owner has payouts enabled
+            payouts_ready = False
+            studio_owner = None
+
+            if address.company and address.company.admin_companies:
+                for admin_comp in address.company.admin_companies:
+                    if admin_comp.admin:
+                        studio_owner = admin_comp.admin
+                        break
+
+            if studio_owner:
+                # Check Stripe payouts
+                if studio_owner.stripe_account_id:
+                    # Check cache first
+                    if studio_owner.stripe_account_id in stripe_statuses:
+                        payouts_ready = stripe_statuses[studio_owner.stripe_account_id]
+                    else:
+                        # Query Stripe API
+                        try:
+                            account = stripe.Account.retrieve(studio_owner.stripe_account_id)
+                            payouts_ready = account.payouts_enabled
+                            stripe_statuses[studio_owner.stripe_account_id] = payouts_ready
+                        except Exception:
+                            payouts_ready = False
+                            stripe_statuses[studio_owner.stripe_account_id] = False
+
+                # Check Square (assume ready if configured)
+                elif studio_owner.payment_gateway == 'square':
+                    payouts_ready = True
+
+            # FILTER: Only include studios where payouts are ready
+            if not payouts_ready:
+                continue
+
             # Build address dict with all relationships
             addr_dict = {
                 "id": address.id,
@@ -158,6 +202,8 @@ async def get_city_studios(
                 ],
                 # Frontend expects "equipments" (plural)
                 "equipments": [],
+                # Add payouts_ready field for frontend
+                "payouts_ready": payouts_ready,
             }
 
             # Add flattened prices and photos (matching Laravel getPricesAttribute and getPhotosAttribute)

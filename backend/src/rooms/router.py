@@ -324,3 +324,36 @@ async def get_room_prices_laravel(
         "message": "Room prices retrieved successfully",
         "code": 200
     }
+
+
+@room_router.post(
+    "/{room_id}/prices",
+    summary="Create room price (Laravel-compatible)",
+    description="Laravel-compatible endpoint to create a price tier for a room.",
+)
+async def create_room_price_laravel(
+    room_id: int,
+    data: RoomPriceCreate,
+    service: Annotated[RoomService, Depends(get_room_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Create a price tier for a room (Laravel-compatible route).
+
+    Laravel: POST /api/room/{room_id}/prices
+
+    Request body:
+        - hours: Duration in hours (required)
+        - total_price: Total price for the duration (required)
+        - is_enabled: Whether the price is enabled (optional, default True)
+    """
+    price = await service.create_price(room_id, data)
+    price_data = RoomPriceResponse.model_validate(price).model_dump()
+
+    # Return Laravel-compatible format
+    return {
+        "success": True,
+        "data": price_data,
+        "message": "Price created successfully",
+        "code": 201
+    }

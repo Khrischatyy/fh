@@ -126,8 +126,11 @@ async def create_stripe_account(
             )
 
         # Create new Stripe Connect account
-        # Use a valid URL for business profile (Stripe doesn't accept localhost)
-        business_url = settings.frontend_url if not settings.frontend_url.startswith("http://localhost") else "https://funny-how.com"
+        # Use a valid URL for business profile (Stripe doesn't accept localhost or 127.0.0.1)
+        if "localhost" in settings.frontend_url or "127.0.0.1" in settings.frontend_url:
+            business_url = "https://funny-how.com"
+        else:
+            business_url = settings.frontend_url
 
         account = stripe.Account.create(
             type="express",
@@ -189,6 +192,19 @@ async def refresh_stripe_account_link(
         Stripe onboarding URL for user to complete account setup
     """
     try:
+        # Check if user has no Stripe account yet
+        if not current_user.stripe_account_id or account_id in ("undefined", "null", "None"):
+            return LaravelResponse(
+                success=False,
+                data={
+                    "error": "No Stripe account found",
+                    "action": "create_account",
+                    "message": "Please create a Stripe account first by calling /payment/stripe/create-account"
+                },
+                message="No Stripe account connected. Please create one first.",
+                code=404
+            )
+
         # Verify the account_id belongs to the current user
         if current_user.stripe_account_id != account_id:
             return LaravelResponse(

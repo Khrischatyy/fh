@@ -96,10 +96,9 @@ class GCSService:
                 content_type='image/jpeg' if convert_to_jpeg else 'image/png'
             )
 
-            # Make blob publicly accessible
-            blob.make_public()
-
-            return blob.public_url
+            # Return public URL (bucket must have public read access configured)
+            # Note: Cannot use make_public() with Uniform Bucket-Level Access
+            return f"https://storage.googleapis.com/{self.bucket_name}/{destination_path}"
 
         except Exception as e:
             raise Exception(f"Failed to upload to GCS: {str(e)}")
@@ -125,3 +124,8 @@ class GCSService:
 
 # Global instance
 gcs_service = GCSService()
+
+
+def get_gcs() -> GCSService:
+    """Get global GCS service instance."""
+    return gcs_service

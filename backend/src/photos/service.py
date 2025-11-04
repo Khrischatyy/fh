@@ -77,10 +77,10 @@ class PhotoService:
                 # Increment index
                 max_index += 1
 
-                # Create database record
+                # Create database record - store only the path, not the full URL
                 room_photo = RoomPhoto(
                     room_id=room_id,
-                    path=photo_url,
+                    path=gcs_path,  # Store path only, not full URL
                     index=max_index
                 )
                 self.db.add(room_photo)

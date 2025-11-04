@@ -7,7 +7,7 @@
         name="dashboard"
     >
       <Spinner :is-loading="isLoading" class="mt-4"/>
-      <div class="container mx-auto p-4">
+      <div v-if="user" class="container mx-auto p-4">
         <div v-if="!isLoading && user.payment_gateway" class="mb-4">
           <p class="text-gray-400">Connected account</p>
           <p class="text-white>">{{ user.payment_gateway == 'square' ? 'Square account' : 'Stripe account' }}</p>
@@ -22,7 +22,7 @@
         >
           <div class="text-xl">
             <p class="text-gray-400 mb-1.5">Balance:</p>
-            <p class="text-sm mb-1.5">
+            <p v-if="balance?.instant_available?.length > 0" class="text-sm mb-1.5">
               Total balance: ${{ balance.instant_available[0]?.amount / 100 }}
             </p>
             <p v-if="balance?.pending?.length > 0" class="text-sm mb-1.5">
@@ -97,7 +97,7 @@
           </button>
         </div>
         <div
-            v-if="user && !user.stripe_account_id && !user.payment_gateway"
+            v-if="!isLoading && !user.stripe_account_id && !user.payment_gateway"
             class="text-center mt-4 flex flex-col items-center justify-center text-gray-400"
         >
           <p class="mb-5">
@@ -378,12 +378,13 @@ const fetchStripeAccountData = async () => {
       auth: true,
     })
 
-    getAccountData().then((res) => {
+    const res = await getAccountData()
+    if (res && res.data) {
       stripeAccountData.value = res.data
-      isLoading.value = false
-    })
+    }
   } catch (error) {
     console.error("Failed to fetch Stripe account ID:", error)
+  } finally {
     isLoading.value = false
   }
 }
@@ -395,19 +396,38 @@ const toggleSideMenu = () => {
 }
 
 onMounted(async () => {
-  if (!user?.value?.company) {
-    await session.fetchUserInfo()
-  }
-  if (!user.value.company) {
-    if (process.client) {
-      navigateTo("/create")
+  try {
+    isLoading.value = true
+
+    // Always refresh user info when landing on payout page
+    // This ensures we get updated stripe_account_id after onboarding
+    const userData = await session.fetchUserInfo()
+
+    console.log('User data after fetch:', userData)
+    console.log('user.value:', user.value)
+
+    if (!user.value || !user.value.company) {
+      console.log('No user or company, redirecting to /create')
+      if (process.client) {
+        navigateTo("/create")
+      }
+      isLoading.value = false
+      return
     }
-  }
-  isLoading.value = false
-  if (user.value && user.value.stripe_account_id) {
-    stripeAccountId.value = user.value.stripe_account_id
-    await fetchStripeAccountData()
-    await fetchBalance()
+
+    if (user.value.stripe_account_id) {
+      console.log('User has Stripe account:', user.value.stripe_account_id)
+      stripeAccountId.value = user.value.stripe_account_id
+      await fetchStripeAccountData()
+      await fetchBalance()
+    } else {
+      console.log('No Stripe account yet')
+      // No Stripe account yet, just hide spinner
+      isLoading.value = false
+    }
+  } catch (error) {
+    console.error("Failed to load payout page:", error)
+    isLoading.value = false
   }
 })
 </script>
