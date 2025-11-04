@@ -121,6 +121,39 @@ class GCSService:
         except Exception:
             return False
 
+    def get_public_url(self, blob_path: str, use_proxy: bool = True) -> str:
+        """
+        Get URL for a blob in the GCS bucket.
+
+        By default, returns a proxied URL through the backend to keep GCS files private.
+        Set use_proxy=False to get direct GCS URLs (files must be public).
+
+        Args:
+            blob_path: Path to the file in the bucket (e.g., 'public/badges/mixing.svg')
+            use_proxy: If True, return proxied URL through backend. If False, return direct GCS URL.
+
+        Returns:
+            URL to access the file
+        """
+        # If it's already a full URL, return as-is
+        if blob_path.startswith("http://") or blob_path.startswith("https://"):
+            return blob_path
+
+        if use_proxy:
+            # Determine proxy endpoint based on path
+            if blob_path.startswith("public/badges/") or "badges" in blob_path:
+                # Badge images use /api/badges/image/ endpoint
+                return f"/api/badges/image/{blob_path}"
+            elif blob_path.startswith("studio/photos/") or blob_path.startswith("studios/"):
+                # Studio photos use /api/photos/image/ endpoint
+                return f"/api/photos/image/{blob_path}"
+            else:
+                # Default to photos endpoint for other images
+                return f"/api/photos/image/{blob_path}"
+        else:
+            # Return direct GCS URL (requires files to be public)
+            return f"https://storage.googleapis.com/{self.bucket_name}/{blob_path}"
+
 
 # Global instance
 gcs_service = GCSService()

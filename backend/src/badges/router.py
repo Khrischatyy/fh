@@ -96,8 +96,9 @@ async def serve_badge_image(
     try:
         gcs = get_gcs()
 
-        # Download the blob
-        blob = gcs.bucket.blob(badge_path)
+        # Get bucket and blob using correct methods
+        bucket = gcs._get_bucket()
+        blob = bucket.blob(badge_path)
 
         if not blob.exists():
             raise HTTPException(status_code=404, detail=f"Badge image not found: {badge_path}")

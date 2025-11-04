@@ -289,16 +289,20 @@ async def get_studio_by_slug(
     """
     Retrieve a studio (address) by its slug with all related data.
 
+    Note: This endpoint returns the studio even if not fully configured,
+    allowing studio owners to view their incomplete setup.
+
     Laravel compatible: GET /api/address/studio/{address_slug}
 
     Returns:
         Complete address with all relationships: badges, rooms, photos, prices,
-        company, operating hours, equipment
+        company, operating hours, equipment, and is_complete status
 
     Raises:
         NotFoundException: If address not found
     """
     from src.addresses.repository import AddressRepository
+    from src.addresses.utils import build_studio_dict
     from src.database import AsyncSessionLocal
     from src.exceptions import NotFoundException
 
@@ -309,111 +313,20 @@ async def get_studio_by_slug(
         if not address:
             raise NotFoundException(f"Address with slug '{address_slug}' not found")
 
-        # Build address dict with all relationships
-        addr_dict = {
-            "id": address.id,
-            "slug": address.slug,
-            "street": address.street,
-            "latitude": str(address.latitude) if address.latitude else None,
-            "longitude": str(address.longitude) if address.longitude else None,
-            "timezone": address.timezone,
-            "rating": address.rating,
-            "city_id": address.city_id,
-            "company_id": address.company_id,
-            "available_balance": float(address.available_balance),
-            "created_at": address.created_at.isoformat(),
-            "updated_at": address.updated_at.isoformat(),
-            "badges": [{"id": b.id, "name": b.name, "image": b.image, "description": b.description} for b in address.badges],
-            "rooms": [
-                {
-                    "id": r.id,
-                    "name": r.name,
-                    "photos": [{"id": p.id, "path": p.path, "index": p.index} for p in r.photos],
-                    "prices": [
-                        {
-                            "id": pr.id,
-                            "hours": pr.hours,
-                            "total_price": float(pr.total_price),
-                            "price_per_hour": float(pr.price_per_hour),
-                            "is_enabled": pr.is_enabled
-                        }
-                        for pr in r.prices if pr.is_enabled  # Only enabled prices like Laravel
-                    ],
-                }
-                for r in address.rooms
-            ],
-            "operating_hours": [
-                {
-                    "id": oh.id,
-                    "day_of_week": oh.day_of_week,
-                    "open_time": oh.open_time.isoformat() if oh.open_time else None,
-                    "close_time": oh.close_time.isoformat() if oh.close_time else None,
-                    "is_closed": oh.is_closed,
-                    "mode_id": oh.mode_id,
-                }
-                for oh in address.operating_hours
-            ],
-            # Frontend expects "equipments" (plural)
-            "equipments": [],
-        }
+        # Build standardized studio dict with is_complete calculation
+        stripe_cache = {}
+        addr_dict = build_studio_dict(
+            address,
+            include_is_complete=True,
+            include_payment_status=False,
+            stripe_cache=stripe_cache
+        )
 
-        # Add flattened prices and photos (matching Laravel getPricesAttribute and getPhotosAttribute)
-        all_prices = []
-        all_photos = []
-        for room in address.rooms:
-            # Only add enabled prices
-            all_prices.extend([
-                {
-                    "id": pr.id,
-                    "hours": pr.hours,
-                    "total_price": float(pr.total_price),
-                    "price_per_hour": float(pr.price_per_hour),
-                    "is_enabled": pr.is_enabled
-                }
-                for pr in room.prices if pr.is_enabled
-            ])
-            all_photos.extend([
-                {
-                    "id": p.id,
-                    "path": p.path,
-                    "index": p.index
-                }
-                for p in room.photos
-            ])
-
-        addr_dict["prices"] = all_prices
-        addr_dict["photos"] = all_photos
-
-        # Calculate is_complete (matching Laravel getIsCompleteAttribute)
-        has_operating_hours = len(address.operating_hours) > 0
-        has_stripe_gateway = False
-        has_square_gateway = False
-
-        if address.company and address.company.admin_companies:
-            for admin_comp in address.company.admin_companies:
-                if admin_comp.admin:
-                    has_stripe_gateway = admin_comp.admin.stripe_account_id is not None
-                    has_square_gateway = admin_comp.admin.payment_gateway == 'square'
-                    break
-
-        addr_dict["is_complete"] = has_operating_hours and (has_stripe_gateway or has_square_gateway)
-
-        # Add company info
-        if address.company:
-            addr_dict["company"] = {
-                "id": address.company.id,
-                "name": address.company.name,
-                "slug": address.company.slug,
-                "logo": address.company.logo,
-                # logo_url intentionally omitted - will be added when S3 integration is ready
-            }
-
-            # Add user_id from admin_company
-            if address.company.admin_companies:
-                for admin_comp in address.company.admin_companies:
-                    if admin_comp.admin:
-                        addr_dict["company"]["user_id"] = admin_comp.admin.id
-                        break
+        # Ensure latitude/longitude are strings for this endpoint (Laravel compatibility)
+        if addr_dict.get("latitude") is not None:
+            addr_dict["latitude"] = str(addr_dict["latitude"])
+        if addr_dict.get("longitude") is not None:
+            addr_dict["longitude"] = str(addr_dict["longitude"])
 
         return addr_dict
 
@@ -736,7 +649,7 @@ map_router = APIRouter(prefix="/map", tags=["Map"])
     response_model=list[MapStudioResponse],
     status_code=status.HTTP_200_OK,
     summary="Get all studios for map view",
-    description="Returns all studios with complete data for displaying on map.",
+    description="Returns all complete studios for displaying on map. Only shows studios with operating hours and payment gateway configured.",
 )
 async def get_map_studios(
     service: Annotated[AddressService, Depends(get_address_service)],
@@ -746,81 +659,44 @@ async def get_map_studios(
 
     Matches Laravel: GET /api/map/studios
 
-    Returns all studios with:
+    Only returns studios where:
+    - Operating hours are configured
+    - Payment gateway (Stripe/Square) has payouts enabled
+
+    Returns studios with:
     - Basic address info (location, name, etc.)
     - Badges/amenities
     - Rooms with photos and prices
     - Company info with logo and user_id
     - Operating hours
+    - is_complete status
 
     Used for displaying studios on interactive map.
     """
+    from src.addresses.utils import build_studio_dict, should_show_in_public_search
+
     studios = await service.get_all_studios_for_map()
 
-    # Convert to response format
+    # Cache Stripe account statuses
+    stripe_cache = {}
+
+    # Filter and convert to response format
     response_studios = []
     for studio in studios:
-        # Build company data with user_id
-        company_data = None
-        if studio.company:
-            company_data = {
-                "id": studio.company.id,
-                "name": studio.company.name,
-                "slug": studio.company.slug,
-                "logo": studio.company.logo,
-                "logo_url": None,  # TODO: Add S3 URL generation when S3 is configured
-                "user_id": None,
-            }
+        # FILTER: Only include complete studios for public map view
+        if not should_show_in_public_search(studio, stripe_cache):
+            continue
 
-            # Extract user_id from admin_companies relationship
-            if studio.company.admin_companies:
-                for admin_comp in studio.company.admin_companies:
-                    if admin_comp.admin:
-                        company_data["user_id"] = admin_comp.admin.id
-                        break
+        # Build standardized studio dict
+        studio_dict = build_studio_dict(
+            studio,
+            include_is_complete=True,
+            include_payment_status=False,
+            stripe_cache=stripe_cache
+        )
 
-        # Convert operating hours to dict format with string times
-        operating_hours_data = []
-        for oh in studio.operating_hours:
-            operating_hours_data.append({
-                "id": oh.id,
-                "mode_id": oh.mode_id,
-                "day_of_week": oh.day_of_week,
-                "open_time": oh.open_time.isoformat() if oh.open_time else None,
-                "close_time": oh.close_time.isoformat() if oh.close_time else None,
-                "is_closed": oh.is_closed,
-            })
-
-        # Calculate is_complete (matching Laravel getIsCompleteAttribute)
-        has_operating_hours = len(studio.operating_hours) > 0
-        has_payment_gateway = False
-        if studio.company and studio.company.admin_companies:
-            for admin_comp in studio.company.admin_companies:
-                if admin_comp.admin:
-                    has_stripe = admin_comp.admin.stripe_account_id is not None
-                    has_square = admin_comp.admin.payment_gateway == 'square'
-                    has_payment_gateway = has_stripe or has_square
-                    break
-
-        # Build studio response
-        studio_dict = {
-            "id": studio.id,
-            "street": studio.street,
-            "city_id": studio.city_id,
-            "company_id": studio.company_id,
-            "latitude": studio.latitude,
-            "longitude": studio.longitude,
-            "slug": studio.slug,
-            "name": studio.name,
-            "timezone": studio.timezone,
-            "badges": studio.badges,
-            "rooms": studio.rooms,
-            "company": company_data,
-            "operating_hours": operating_hours_data,
-            "is_complete": has_operating_hours and has_payment_gateway,
-            "created_at": studio.created_at,
-            "updated_at": studio.updated_at,
-        }
+        # Map view needs specific additional fields
+        studio_dict["name"] = studio.name
 
         response_studios.append(MapStudioResponse.model_validate(studio_dict))
 

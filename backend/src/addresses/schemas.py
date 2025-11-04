@@ -5,7 +5,7 @@ Defines request and response models for the Address domain.
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class AddressBase(BaseModel):
@@ -150,6 +150,14 @@ class MapRoomPhotoResponse(BaseModel):
     id: int
     path: str
     index: int
+
+    @model_validator(mode='after')
+    def transform_photo_path(self) -> 'MapRoomPhotoResponse':
+        """Transform photo path to proxy URL."""
+        if self.path and not self.path.startswith('http') and not self.path.startswith('/api/'):
+            # Convert GCS path to proxy URL
+            self.path = f"/api/photos/image/{self.path}"
+        return self
 
     model_config = {"from_attributes": True}
 

@@ -4,7 +4,7 @@ My Studios schemas - API contracts for my-studios endpoints.
 from datetime import datetime, time as time_type
 from decimal import Decimal
 from typing import Optional, Any
-from pydantic import BaseModel, computed_field, field_serializer
+from pydantic import BaseModel, computed_field, field_serializer, model_validator
 
 from src.geographic.schemas import CityResponse
 
@@ -43,6 +43,14 @@ class BadgeResponse(BaseModel):
     image: Optional[str] = None
     description: Optional[str] = None
 
+    @model_validator(mode='after')
+    def transform_image_path(self) -> 'BadgeResponse':
+        """Transform badge image path to proxy URL."""
+        if self.image and not self.image.startswith('http'):
+            # Convert GCS path to proxy URL
+            self.image = f"/api/badges/image/{self.image}"
+        return self
+
     class Config:
         from_attributes = True
 
@@ -77,11 +85,19 @@ class RoomPhotoResponse(BaseModel):
     path: str
     index: int
 
+    @model_validator(mode='after')
+    def transform_photo_path(self) -> 'RoomPhotoResponse':
+        """Transform photo path to proxy URL."""
+        if self.path and not self.path.startswith('http') and not self.path.startswith('/api/'):
+            # Convert GCS path to proxy URL
+            self.path = f"/api/photos/image/{self.path}"
+        return self
+
     @computed_field
     @property
     def url(self) -> str:
         """Generate proxy URL for the photo."""
-        return f"/api/photos/image/{self.path}"
+        return self.path
 
     class Config:
         from_attributes = True

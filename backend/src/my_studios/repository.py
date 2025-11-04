@@ -65,7 +65,7 @@ class MyStudiosRepository:
             .where(AdminCompany.admin_id == user_id)
             .options(
                 joinedload(Address.city),
-                joinedload(Address.company),
+                joinedload(Address.company).selectinload(Company.admin_companies).joinedload(AdminCompany.admin),
                 selectinload(Address.operating_hours),
                 selectinload(Address.badges),
                 selectinload(Address.rooms).selectinload(Room.photos),
