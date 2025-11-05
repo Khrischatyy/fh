@@ -126,18 +126,22 @@ backend/src/{domain}/
 ```
 
 **Key Modules:**
-- `auth/` - Authentication & user management (JWT, Google OAuth)
-- `users/` - User profile management
-- `companies/` - Studio/business entities
-- `addresses/` - Studio locations with geolocation and operating hours
-- `rooms/` - Bookable spaces with pricing
+- `auth/` - Authentication & user management (JWT, Google OAuth, Laravel Sanctum-compatible tokens)
+- `users/` - User profile management with payment gateway info (Stripe, Square)
+- `companies/` - Studio/business entities linked to owners via `admin_company`
+- `addresses/` - Studio locations with geolocation, operating hours, and completion status
+  - `utils.py` - Reusable utility functions for studio visibility, completion checks, data transformation
+- `rooms/` - Bookable spaces with pricing and photo galleries
 - `bookings/` - Reservation system with availability checking
 - `operating_hours/` - Studio operating hours management (modes: 24/7, fixed, variable)
-- `payments/` - Multi-gateway (Stripe, Square) payment processing
+- `payments/` - Multi-gateway (Stripe, Square) payment processing with payout verification
 - `messages/` - Direct messaging between users and studio owners
-- `geographic/` - Countries, cities reference data
+- `geographic/` - Countries, cities reference data with studio filtering
+- `my_studios/` - Studio owner's studio management (list, filter, with completion status)
 - `tasks/` - Celery background tasks (email, bookings, payments)
 - `teams/` - Studio team members/engineers
+- `storage.py` - Google Cloud Storage integration for media uploads
+- `gcs_utils.py` - GCS utility functions for generating proxy URLs
 
 **Important Patterns:**
 - Services contain all business logic (slug generation, validation)
@@ -200,6 +204,292 @@ The bookings module implements a sophisticated availability checking system:
 - Frontend TimeSelect component expects `{time, iso_string}` format from backend
 - Operating hours are stored in `addresses.operating_hours` relationship
 - Bookings exclude `cancelled` and `expired` statuses when checking availability
+
+### Studio Visibility and Completion Logic
+
+The platform implements sophisticated studio visibility rules to ensure only properly configured studios appear in public search results.
+
+**Key Module:** `backend/src/addresses/utils.py`
+
+**Studio Completion (`is_complete`) Requirements:**
+
+A studio is considered "complete" and ready for public visibility when ALL of the following are met:
+
+1. **Operating Hours Configured**
+   - At least one operating hours record exists
+   - Can be Mode 1 (24/7), Mode 2 (Fixed), or Mode 3 (Variable)
+
+2. **Payment Gateway with Payouts Enabled**
+   - **Stripe**: `stripe_account_id` exists AND `payouts_enabled = true` (verified via Stripe API)
+   - **Square**: `payment_gateway = 'square'` (assumes ready if configured)
+
+**Utility Functions (`addresses/utils.py`):**
+
+```python
+# Check if studio setup is complete
+is_studio_complete(address: Address) -> bool
+
+# Check if payment gateway is properly connected
+has_payment_gateway_connected(address: Address) -> bool
+
+# Get studio owner (admin user)
+get_studio_owner(address: Address) -> Optional[User]
+
+# Verify Stripe payouts enabled (with caching)
+check_stripe_payouts_enabled(stripe_account_id: str) -> bool
+
+# Build standardized studio dictionary
+build_studio_dict(
+    address: Address,
+    include_is_complete: bool = True,
+    include_payment_status: bool = False,
+    stripe_cache: Optional[dict] = None
+) -> dict
+
+# Determine if studio should be visible in public search
+should_show_in_public_search(address: Address, stripe_cache: Optional[dict] = None) -> bool
+```
+
+**Public vs Owner View Filtering:**
+
+- **Public Endpoints** (`/api/city/{city_id}/studios`, `/api/map/studios`):
+  - Filter: Only show studios where `should_show_in_public_search()` returns `True`
+  - Requires: Operating hours + payment gateway with payouts enabled
+
+- **Owner Endpoints** (`/api/my-studios/filter`):
+  - No filtering: Show all studios owned by the user
+  - Includes: `is_complete` status to guide setup completion
+  - Includes: `stripe_account_id` for payment gateway info
+
+**Stripe API Caching:**
+
+To avoid repeated API calls, implementations use caching:
+```python
+stripe_cache = {}  # {stripe_account_id: payouts_enabled}
+# Reused across all studios in a single request
+```
+
+**Data Relationships:**
+
+Studios connect to payment gateways through this chain:
+```
+Address → Company → AdminCompany → User (admin)
+                                    ↓
+                            stripe_account_id
+                            payment_gateway
+```
+
+### Media/Asset Management (Photos & Badges)
+
+The platform uses Google Cloud Storage (GCS) with proxy endpoints to serve media privately.
+
+**Storage Architecture:**
+
+1. **Google Cloud Storage**: Primary storage for all media files
+   - Photos: `studio/photos/{uuid}.jpg`
+   - Badges: `public/badges/{name}.svg`
+
+2. **Proxy Endpoints**: Backend serves files to keep GCS private
+   - Photos: `/api/photos/image/{path}`
+   - Badges: `/api/badges/image/{path}`
+
+**Photo Path Transformation:**
+
+Photos must be transformed from GCS paths to proxy URLs:
+
+```python
+# Raw path from database
+"studio/photos/de1b2f25.jpg"
+
+# Transformed for frontend (via _transform_photo_path)
+"/api/photos/image/studio/photos/de1b2f25.jpg"
+```
+
+**Badge Image Transformation:**
+
+Badges must be transformed using `get_public_url()`:
+
+```python
+from src.gcs_utils import get_public_url
+
+# Raw path from database
+"public/badges/rent.svg"
+
+# Transformed for frontend
+get_public_url("public/badges/rent.svg")
+# Returns: "/api/badges/image/public/badges/rent.svg"
+```
+
+**Frontend Expectations:**
+
+- **PhotoSwipe Component**: Expects `photo.path` with full URL
+- **BadgesList Component**: Expects `badge.image` with full URL
+- Both use proxy URLs that route through the backend
+
+**Pydantic Schema Transformations:**
+
+Schemas automatically transform paths when using `model_validator`:
+
+```python
+@model_validator(mode='after')
+def transform_photo_path(self) -> 'MapRoomPhotoResponse':
+    """Transform photo path to proxy URL."""
+    if self.path and not self.path.startswith('http') and not self.path.startswith('/api/'):
+        self.path = f"/api/photos/image/{self.path}"
+    return self
+```
+
+**Important:** When using `build_studio_dict()` utility (which returns raw dicts), transformations are applied automatically.
+
+### My Studios Module - Studio Owner Management
+
+Owner-specific endpoints for managing their own studios.
+
+**Endpoints:**
+
+```
+GET  /api/my-studios/cities         # Get cities where user has studios
+GET  /api/my-studios/                # Get all user's studios
+POST /api/my-studios/filter          # Filter user's studios (by city)
+```
+
+**Key Features:**
+
+1. **No Public Filtering**: Shows ALL studios owned by the user, regardless of completion status
+2. **Completion Status**: Returns `is_complete` to guide setup
+3. **Payment Gateway Info**: Includes `stripe_account_id` in response
+4. **Photo Aggregation**: Flattens all photos from all rooms to top level
+5. **Price Aggregation**: Flattens all prices from all rooms to top level
+
+**Response Structure:**
+
+```json
+{
+  "success": true,
+  "data": [{
+    "id": 18,
+    "slug": "section-los-angeles-2",
+    "street": "435 Arden Avenue",
+    "stripe_account_id": "acct_1SPYMgRoNlrpg5Us",
+    "is_complete": true,
+    "operating_hours": [...],
+    "rooms": [...],
+    "photos": [...],  // Aggregated from all rooms
+    "prices": [...],  // Aggregated from all rooms
+    "badges": [...],
+    "company": {...}
+  }],
+  "message": "Studios retrieved successfully",
+  "code": 200
+}
+```
+
+**Data Loading:**
+
+Repository loads full relationship chain:
+```python
+.options(
+    joinedload(Address.city),
+    joinedload(Address.company).selectinload(Company.admin_companies).joinedload(AdminCompany.admin),
+    selectinload(Address.operating_hours),
+    selectinload(Address.badges),
+    selectinload(Address.rooms).selectinload(Room.photos),
+    selectinload(Address.rooms).selectinload(Room.prices),
+)
+```
+
+**Photo URL Transformation:**
+
+Uses Pydantic schema with `model_validator` for automatic transformation:
+```python
+from src.my_studios.schemas import RoomPhotoResponse
+
+# Convert and transform photos
+for photo in room.photos:
+    photo_response = RoomPhotoResponse.model_validate(photo)
+    all_photos.append(photo_response)
+```
+
+### Payment Gateway Integration
+
+Multi-gateway support with real-time payout verification.
+
+**Supported Gateways:**
+
+1. **Stripe Connect**
+   - Account linking via OAuth
+   - Real-time payout verification via Stripe API
+   - Fields: `stripe_account_id` (on User model)
+   - Verification: `account.payouts_enabled` must be `True`
+
+2. **Square**
+   - Simplified integration
+   - Fields: `payment_gateway = 'square'` (on User model)
+   - Assumption: If configured, considered ready
+
+**Payout Verification Flow:**
+
+```python
+# 1. Get studio owner
+studio_owner = get_studio_owner(address)
+
+# 2. Check payment gateway type
+if studio_owner.stripe_account_id:
+    # Stripe: Verify via API
+    account = stripe.Account.retrieve(studio_owner.stripe_account_id)
+    payouts_ready = account.payouts_enabled
+
+elif studio_owner.payment_gateway == 'square':
+    # Square: Assume ready
+    payouts_ready = True
+```
+
+**Caching Strategy:**
+
+Avoid repeated Stripe API calls within a single request:
+
+```python
+stripe_cache = {}
+
+for studio in studios:
+    studio_owner = get_studio_owner(studio)
+
+    if studio_owner.stripe_account_id in stripe_cache:
+        # Use cached result
+        payouts_ready = stripe_cache[studio_owner.stripe_account_id]
+    else:
+        # Query Stripe API once
+        payouts_ready = check_stripe_payouts_enabled(studio_owner.stripe_account_id)
+        stripe_cache[studio_owner.stripe_account_id] = payouts_ready
+```
+
+**Database Structure:**
+
+```sql
+-- User has payment gateway info
+users:
+  - stripe_account_id: VARCHAR (Stripe Connect account)
+  - payment_gateway: VARCHAR ('stripe' or 'square')
+
+-- User linked to Company via AdminCompany
+admin_company:
+  - admin_id: INT (references users.id)
+  - company_id: INT (references companies.id)
+
+-- Company has Addresses (studios)
+addresses:
+  - company_id: INT (references companies.id)
+  - operating_hours: relationship
+```
+
+**Configuration:**
+
+Environment variables in `.env`:
+```bash
+STRIPE_PUBLIC_KEY=pk_test_...
+STRIPE_API_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
 
 ### Laravel Backend (laravel/) - Legacy
 
@@ -487,48 +777,403 @@ backend/src/
 
 ## Common Patterns and Best Practices
 
-1. **Type Aliasing**: Always use type aliases to avoid Pydantic field name conflicts
-   ```python
-   from datetime import date as date_type, time as time_type
-   ```
+### 1. Type Aliasing
+Always use type aliases to avoid Pydantic field name conflicts:
+```python
+from datetime import date as date_type, time as time_type
+```
 
-2. **Photo URLs**: Frontend always uses `.path` property, not `.url`
-   ```python
-   # Backend model
-   photo.path  # ✓ Correct
-   photo.url   # ✗ Wrong - will cause undefined errors
-   ```
+### 2. Media URL Handling
 
-3. **Operating Hours Logic**:
-   - Mode 1 (24/7): Returns first record
-   - Mode 2 (Fixed): Returns first record
-   - Mode 3 (Variable): Filter by `day_of_week` (0=Sunday, 6=Saturday)
+**Photos:**
+```python
+# Frontend always uses .path property
+photo.path  # ✓ Correct - transformed to proxy URL
+photo.url   # ✗ Wrong - will cause undefined errors
 
-4. **Timezone Handling**: Always use pytz for timezone-aware datetime
-   ```python
-   import pytz
-   tz = pytz.timezone(address.timezone)  # e.g., "Europe/Belgrade"
-   now = datetime.now(tz)
-   ```
+# Transform raw paths to proxy URLs
+from src.addresses.utils import _transform_photo_path
+proxy_url = _transform_photo_path("studio/photos/abc123.jpg")
+# Returns: "/api/photos/image/studio/photos/abc123.jpg"
+```
 
-5. **Response Format**: TimeSelect expects `{time: "HH:MM", iso_string: "ISO8601"}`
-   ```json
-   {
-     "available_times": [
-       {"time": "10:00", "iso_string": "2025-10-31T10:00:00+01:00"}
-     ]
-   }
-   ```
+**Badges:**
+```python
+# Transform badge images to proxy URLs
+from src.gcs_utils import get_public_url
+proxy_url = get_public_url("public/badges/mixing.svg")
+# Returns: "/api/badges/image/public/badges/mixing.svg"
+```
 
-6. **Booking Exclusions**: Always exclude cancelled and expired bookings when checking availability
-   ```python
-   excluded_statuses=['cancelled', 'expired']
-   ```
+### 3. Studio Completion and Visibility
 
-7. **Relationship Loading**: Use `selectinload()` for one-to-many, `joinedload()` for many-to-one
-   ```python
-   .options(
-       selectinload(Room.address).selectinload(Address.operating_hours),
-       selectinload(Room.prices)
-   )
-   ```
+**Check if studio is complete:**
+```python
+from src.addresses.utils import is_studio_complete, should_show_in_public_search
+
+# For displaying completion status
+if is_studio_complete(address):
+    print("Studio setup is complete")
+
+# For filtering public search results
+if should_show_in_public_search(address, stripe_cache):
+    # Include in search results
+    pass
+```
+
+**Build standardized studio response:**
+```python
+from src.addresses.utils import build_studio_dict
+
+# Use Stripe cache to avoid repeated API calls
+stripe_cache = {}
+
+for address in addresses:
+    studio_dict = build_studio_dict(
+        address,
+        include_is_complete=True,      # Include is_complete field
+        include_payment_status=False,   # Include payouts_ready field
+        stripe_cache=stripe_cache       # Reuse cache
+    )
+```
+
+### 4. Operating Hours Logic
+- **Mode 1 (24/7)**: Returns first record
+- **Mode 2 (Fixed)**: Returns first record (same hours daily)
+- **Mode 3 (Variable)**: Filter by `day_of_week` (0=Sunday, 6=Saturday)
+
+### 5. Timezone Handling
+Always use pytz for timezone-aware datetime:
+```python
+import pytz
+tz = pytz.timezone(address.timezone)  # e.g., "America/Los_Angeles"
+now = datetime.now(tz)
+```
+
+### 6. Response Formats
+
+**TimeSelect (availability endpoints):**
+```json
+{
+  "available_times": [
+    {"time": "10:00", "iso_string": "2025-10-31T10:00:00+01:00"}
+  ]
+}
+```
+
+**Laravel-compatible responses:**
+```json
+{
+  "success": true,
+  "data": [...],
+  "message": "Operation successful",
+  "code": 200
+}
+```
+
+### 7. Booking Exclusions
+Always exclude cancelled and expired bookings when checking availability:
+```python
+excluded_statuses = ['cancelled', 'expired']
+```
+
+### 8. SQLAlchemy Relationship Loading
+
+**Use appropriate loading strategies:**
+```python
+# One-to-many: Use selectinload()
+.options(selectinload(Address.rooms).selectinload(Room.photos))
+
+# Many-to-one: Use joinedload()
+.options(joinedload(Address.company))
+
+# Complex chains: Mix both
+.options(
+    joinedload(Address.company)
+        .selectinload(Company.admin_companies)
+        .joinedload(AdminCompany.admin),
+    selectinload(Address.operating_hours),
+    selectinload(Address.badges),
+)
+```
+
+### 9. Payment Gateway Verification
+
+**Always verify payouts are enabled:**
+```python
+from src.addresses.utils import get_studio_owner, check_stripe_payouts_enabled
+
+studio_owner = get_studio_owner(address)
+
+if studio_owner.stripe_account_id:
+    # Verify Stripe payouts
+    if check_stripe_payouts_enabled(studio_owner.stripe_account_id):
+        print("Stripe payouts enabled")
+
+elif studio_owner.payment_gateway == 'square':
+    # Square assumed ready if configured
+    print("Square configured")
+```
+
+### 10. Authentication Patterns
+
+**Token format (Laravel Sanctum-compatible):**
+```bash
+# Format: {user_id}|{jwt_token}
+Authorization: Bearer 15|eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Dependencies:**
+```python
+from src.auth.dependencies import get_current_user
+
+# Extracts user from token automatically
+async def my_endpoint(current_user: User = Depends(get_current_user)):
+    print(f"Authenticated as: {current_user.email}")
+```
+
+### 11. Code Organization
+
+**Always delegate to utility functions:**
+```python
+# ✓ Good: Use centralized utilities
+from src.addresses.utils import build_studio_dict
+
+studio_dict = build_studio_dict(address)
+
+# ✗ Bad: Duplicate logic in routers
+studio_dict = {
+    "id": address.id,
+    "badges": [...],  # Manually building...
+}
+```
+
+**Keep routers thin:**
+```python
+# ✓ Good: Router delegates to service
+@router.get("/studios")
+async def get_studios(service: MyService = Depends()):
+    return await service.get_studios()
+
+# ✗ Bad: Business logic in router
+@router.get("/studios")
+async def get_studios():
+    # Complex queries and transformations here...
+    pass
+```
+
+### 12. Error Handling
+
+**Use custom exceptions:**
+```python
+from src.exceptions import NotFoundException, ConflictException
+
+# Not found
+if not studio:
+    raise NotFoundException("Studio not found")
+
+# Business logic conflict
+if not has_operating_hours:
+    raise ConflictException("Operating hours must be configured first")
+```
+
+**Laravel-compatible validation errors:**
+```python
+# Automatically handled by Pydantic
+# Returns 422 with:
+{
+  "message": "Validation error",
+  "errors": {
+    "email": ["Email is required"]
+  }
+}
+```
+
+## Key API Endpoints Reference
+
+### Public Studio Endpoints
+
+**Search studios by city:**
+```http
+GET /api/city/{city_id}/studios
+Authorization: Bearer {token} (optional)
+```
+- Filters: Only complete studios (has operating hours + payment gateway)
+- Returns: Studios with `is_complete: true` and `payouts_ready: true`
+- Use case: Public studio search, map markers
+
+**Get studio by slug:**
+```http
+GET /api/address/studio/{slug}
+```
+- Filters: None (shows incomplete studios too)
+- Returns: Full studio details with `is_complete` status
+- Use case: Studio detail page, owner preview
+
+**Map view studios:**
+```http
+GET /api/map/studios
+```
+- Filters: Only complete studios
+- Returns: Studios optimized for map display
+- Use case: Interactive map view
+
+### Studio Owner Endpoints
+
+**List owner's studios:**
+```http
+POST /api/my-studios/filter
+Authorization: Bearer {token}
+Body: { "city_id": 11 } (optional)
+```
+- Filters: None (shows all owner's studios)
+- Returns: All studios with `is_complete` and `stripe_account_id`
+- Use case: Studio management dashboard
+
+**Get owner's cities:**
+```http
+GET /api/my-studios/cities
+Authorization: Bearer {token}
+```
+- Returns: Cities where owner has studios
+- Use case: City filter dropdown
+
+### Operating Hours Endpoints
+
+**Get operating hours:**
+```http
+GET /api/address/operating-hours?address_id={id}
+Authorization: Bearer {token}
+```
+
+**Set operating hours:**
+```http
+POST /api/address/operating-hours
+Authorization: Bearer {token}
+Body: {
+  "address_id": 18,
+  "mode_id": 1,  // 1=24/7, 2=Fixed, 3=Variable
+  "open_time": "09:00",    // Required for mode 2
+  "close_time": "17:00",   // Required for mode 2
+  "hours": [...]           // Required for mode 3
+}
+```
+
+### Booking/Availability Endpoints
+
+**Get available start times:**
+```http
+GET /api/address/reservation/start-time?room_id={id}&date=2025-11-04
+```
+
+**Get available end times:**
+```http
+GET /api/address/reservation/end-time?room_id={id}&date=2025-11-04&start_time=10:00
+```
+
+### Badge/Amenity Endpoints
+
+**Get all badges:**
+```http
+GET /api/address/{address_id}/badges
+Authorization: Bearer {token}
+```
+- Returns: `all_badges` and `taken_badges` arrays
+
+**Toggle badge:**
+```http
+POST /api/address/{address_id}/badge
+Authorization: Bearer {token}
+Body: { "badge_id": 3 }
+```
+
+### Media Proxy Endpoints
+
+**Photo proxy:**
+```http
+GET /api/photos/image/{path}
+Example: /api/photos/image/studio/photos/abc123.jpg
+```
+
+**Badge proxy:**
+```http
+GET /api/badges/image/{path}
+Example: /api/badges/image/public/badges/mixing.svg
+```
+
+## Troubleshooting Common Issues
+
+### Issue: Studios not showing in public search
+
+**Check:**
+1. Operating hours configured? `len(address.operating_hours) > 0`
+2. Payment gateway connected? `user.stripe_account_id` or `user.payment_gateway == 'square'`
+3. Stripe payouts enabled? `stripe.Account.retrieve(account_id).payouts_enabled == True`
+
+**Solution:**
+```python
+from src.addresses.utils import should_show_in_public_search
+if not should_show_in_public_search(address):
+    print("Studio not ready for public display")
+```
+
+### Issue: Images not loading (broken badges/photos)
+
+**Check:**
+1. Are paths transformed? Should start with `/api/photos/image/` or `/api/badges/image/`
+2. Using `build_studio_dict()`? It auto-transforms paths
+3. Using Pydantic schemas? They have `model_validator` for transformation
+
+**Solution:**
+```python
+# For badges
+from src.gcs_utils import get_public_url
+badge_image = get_public_url(badge.image)
+
+# For photos
+from src.addresses.utils import _transform_photo_path
+photo_path = _transform_photo_path(photo.path)
+```
+
+### Issue: `is_complete` showing false incorrectly
+
+**Check:**
+1. User's `stripe_account_id` not null?
+2. Stripe API returning `payouts_enabled = true`?
+3. Operating hours exist for the studio?
+
+**Debug:**
+```python
+from src.addresses.utils import get_studio_owner, check_stripe_payouts_enabled
+
+owner = get_studio_owner(address)
+print(f"Stripe ID: {owner.stripe_account_id}")
+print(f"Payouts: {check_stripe_payouts_enabled(owner.stripe_account_id)}")
+print(f"Op Hours: {len(address.operating_hours)}")
+```
+
+### Issue: Duplicate Stripe API calls
+
+**Solution:** Always use caching within request scope:
+```python
+stripe_cache = {}
+for studio in studios:
+    studio_dict = build_studio_dict(studio, stripe_cache=stripe_cache)
+```
+
+### Issue: Frontend component works in one page but not another
+
+**Check:**
+1. API responses have same structure? Use `build_studio_dict()`
+2. Photos have `.path`? Not `.url`
+3. Badges have `.image` with proxy URL?
+4. Response includes all required fields?
+
+**Consistency pattern:**
+```python
+# All public endpoints should use the same utility
+from src.addresses.utils import build_studio_dict
+
+# This ensures consistent structure everywhere
+studio_dict = build_studio_dict(address, ...)
+```
