@@ -33,6 +33,7 @@ services:
         - AXIOS_BASEURL=http://caddy
         - AXIOS_BASEURL_CLIENT=https://funny-how.com
         - AXIOS_API_VERSION=/api
+        - NUXT_ENV_GOOGLE_MAPS_API=${GOOGLE_MAPS_API}
     container_name: funny-how-frontend-prod
     expose:
       - "3000"

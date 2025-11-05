@@ -15,6 +15,8 @@ from src.payments.models import Charge, Payout
 from src.database import AsyncSessionLocal
 from src.db.seeders.role_seeder import seed_roles
 from src.db.seeders.badge_seeder import seed_badges
+from src.db.seeders.operating_mode_seeder import seed_operating_modes
+from src.db.seeders.booking_status_seeder import seed_booking_statuses
 
 
 async def run_seeders():
@@ -29,6 +31,14 @@ async def run_seeders():
 
         print("🏷️  Seeding badges...")
         await seed_badges(session)
+        print()
+
+        print("⏰ Seeding operating modes...")
+        await seed_operating_modes(session)
+        print()
+
+        print("📅 Seeding booking statuses...")
+        await seed_booking_statuses(session)
         print()
 
     print("✅ Done!")
