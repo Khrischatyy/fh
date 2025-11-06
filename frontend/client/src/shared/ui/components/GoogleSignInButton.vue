@@ -38,8 +38,26 @@ import {ACCESS_TOKEN_KEY} from "~/src/lib/api/config";
 
 const isAuthorized = useCookie(ACCESS_TOKEN_KEY).value;
 
-function redirectToGoogle() {
-  window.location.href = `/api/v1/auth/google/redirect`;
+async function redirectToGoogle() {
+  try {
+    // Fetch the Google OAuth URL from FastAPI backend
+    const response = await fetch('/api/auth/google/redirect', {
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+
+    if (data.url) {
+      // Redirect to Google OAuth consent page
+      window.location.href = data.url;
+    } else {
+      console.error('Failed to get Google OAuth URL');
+    }
+  } catch (error) {
+    console.error('Error initiating Google Sign-In:', error);
+  }
 }
 </script>
 

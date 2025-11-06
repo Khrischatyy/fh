@@ -350,67 +350,90 @@ async def google_callback(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Handle Google OAuth callback.
+    Handle Google OAuth callback (Laravel compatible).
+
+    Exchanges authorization code for user info, creates/updates user,
+    and redirects to frontend with Sanctum-style token.
 
     - **code**: Authorization code from Google (query parameter)
     """
-    # Exchange code for access token
-    token_url = "https://oauth2.googleapis.com/token"
-    token_data = {
-        "code": code,
-        "client_id": settings.google_client_id,
-        "client_secret": settings.google_client_secret,
-        "redirect_uri": settings.google_redirect_uri,
-        "grant_type": "authorization_code",
-    }
+    from fastapi.responses import RedirectResponse
 
-    async with httpx.AsyncClient() as client:
-        token_response = await client.post(token_url, data=token_data)
-        if token_response.status_code != 200:
-            raise BadRequestException("Failed to obtain access token from Google")
+    try:
+        # Exchange code for access token
+        token_url = "https://oauth2.googleapis.com/token"
+        token_data = {
+            "code": code,
+            "client_id": settings.google_client_id,
+            "client_secret": settings.google_client_secret,
+            "redirect_uri": settings.google_redirect_uri,
+            "grant_type": "authorization_code",
+        }
 
-        token_json = token_response.json()
-        access_token = token_json.get("access_token")
+        async with httpx.AsyncClient() as client:
+            token_response = await client.post(token_url, data=token_data)
+            if token_response.status_code != 200:
+                raise BadRequestException("Failed to obtain access token from Google")
 
-        # Get user info from Google
-        userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
-        headers = {"Authorization": f"Bearer {access_token}"}
-        userinfo_response = await client.get(userinfo_url, headers=headers)
+            token_json = token_response.json()
+            access_token = token_json.get("access_token")
 
-        if userinfo_response.status_code != 200:
-            raise BadRequestException("Failed to get user info from Google")
+            # Get user info from Google
+            userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
+            headers = {"Authorization": f"Bearer {access_token}"}
+            userinfo_response = await client.get(userinfo_url, headers=headers)
 
-        user_info = userinfo_response.json()
+            if userinfo_response.status_code != 200:
+                raise BadRequestException("Failed to get user info from Google")
 
-    # Create or get user
-    google_id = user_info.get("id")
-    email = user_info.get("email")
-    firstname = user_info.get("given_name", "")
-    lastname = user_info.get("family_name", "")
-    avatar = user_info.get("picture")
+            user_info = userinfo_response.json()
 
-    user = await auth_service.get_user_by_google_id(db, google_id)
-    if not user:
-        user = await auth_service.create_google_user(
-            db,
-            google_id=google_id,
-            email=email,
-            firstname=firstname,
-            lastname=lastname,
-            avatar=avatar,
+        # Extract user data from Google response
+        google_id = user_info.get("id")
+        email = user_info.get("email")
+        firstname = user_info.get("given_name") or ""
+        lastname = user_info.get("family_name") or ""
+        avatar = user_info.get("picture")
+
+        # Check if user with email exists
+        user = await auth_service.get_user_by_email(db, email)
+
+        if user:
+            # Update existing user with Google ID and avatar
+            user = await auth_service.update_google_user(
+                db,
+                user=user,
+                google_id=google_id,
+                avatar=avatar,
+            )
+        else:
+            # Create new user from Google data
+            user = await auth_service.create_google_user(
+                db,
+                google_id=google_id,
+                email=email,
+                firstname=firstname,
+                lastname=lastname,
+                avatar=avatar,
+            )
+
+        # Create access token (Sanctum-style format: {id}|{token})
+        access_token_jwt = auth_service.create_access_token(
+            data={"sub": str(user.id)},
+            expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
         )
 
-    # Create access token
-    app_access_token = auth_service.create_access_token(
-        data={"sub": user.id},
-        expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
-    )
+        # Format token like Laravel Sanctum: "{id}|{plainTextToken}"
+        sanctum_token = f"{user.id}|{access_token_jwt}"
 
-    return schemas.GoogleAuthResponse(
-        access_token=app_access_token,
-        token_type="bearer",
-        user=schemas.UserResponse.model_validate(user),
-    )
+        # Redirect to frontend with token (Laravel behavior)
+        frontend_callback_url = f"{settings.frontend_url}/auth/callback?token={sanctum_token}"
+        return RedirectResponse(url=frontend_callback_url)
+
+    except Exception as e:
+        # On error, redirect to frontend login page with error
+        error_url = f"{settings.frontend_url}/login?error=google_auth_failed"
+        return RedirectResponse(url=error_url)
 
 
 @router.post("/resend-verification")

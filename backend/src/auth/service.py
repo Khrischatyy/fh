@@ -136,29 +136,69 @@ class AuthService:
         lastname: str,
         avatar: Optional[str] = None,
     ) -> User:
-        """Create user from Google OAuth."""
-        # Check if user with email exists
-        existing_user = await self.get_user_by_email(db, email)
-        if existing_user:
-            # Link Google ID to existing user
-            existing_user.google_id = google_id
-            if avatar:
-                existing_user.profile_photo = avatar
-            existing_user.email_verified_at = datetime.utcnow()
-            await db.commit()
-            await db.refresh(existing_user)
-            return existing_user
+        """
+        Create user from Google OAuth (Laravel compatible).
+
+        Creates new user with:
+        - Google ID
+        - Email (verified)
+        - First name and last name from Google
+        - Random 12-char password (like Laravel)
+        - Profile photo from Google avatar
+        - Sends welcome email job
+        """
+        # Generate random password (12 chars like Laravel)
+        random_password = secrets.token_urlsafe(12)
+        hashed_password = self.hash_password(random_password)
 
         # Create new user
         user = User(
             google_id=google_id,
             email=email,
-            firstname=firstname,
-            lastname=lastname,
+            firstname=firstname or "User",
+            lastname=lastname or "",
+            password_hash=hashed_password,
+            profile_photo=avatar,
             email_verified_at=datetime.utcnow(),
+            role="user",  # Default role for Google OAuth users
         )
 
         db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+        # Send welcome email (queued via Celery, like Laravel)
+        from src.tasks.email import send_welcome_email
+        send_welcome_email.delay(
+            email=user.email,
+            firstname=user.firstname,
+            lastname=user.lastname
+        )
+
+        return user
+
+    async def update_google_user(
+        self,
+        db: AsyncSession,
+        user: User,
+        google_id: str,
+        avatar: Optional[str] = None,
+    ) -> User:
+        """
+        Update existing user with Google ID (Laravel compatible).
+
+        Updates user's google_id and profile photo if Google login
+        is used for an existing account.
+        """
+        user.google_id = google_id
+
+        if avatar:
+            user.profile_photo = avatar
+
+        # Mark email as verified if not already
+        if not user.email_verified_at:
+            user.email_verified_at = datetime.utcnow()
+
         await db.commit()
         await db.refresh(user)
 

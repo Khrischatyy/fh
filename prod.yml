@@ -68,6 +68,8 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/2
+      - GOOGLE_REDIRECT_URI=https://funny-how.com/api/auth/google/callback
+      - FRONTEND_URL=https://funny-how.com
     depends_on:
       db:
         condition: service_healthy
@@ -141,6 +143,7 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/2
+      - FRONTEND_URL=https://funny-how.com
     depends_on:
       db:
         condition: service_healthy
