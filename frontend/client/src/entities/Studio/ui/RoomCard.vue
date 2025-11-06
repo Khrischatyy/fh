@@ -1,6 +1,9 @@
 <template>
   <div
-    class="bg-[#010907] h-full max-h-[150px] sm:max-h-[234px] rounded-md shadow-lg flex flex-col justify-between relative border border-dashed border-white  duration-300 hover:scale-105 transform-gpu origin-center"
+    :class="[
+      'bg-[#010907] h-full rounded-md shadow-lg flex flex-col justify-between relative border border-dashed transition-all duration-300 transform-gpu origin-center cursor-pointer',
+      isSelected ? 'border-white scale-105 shadow-2xl' : 'border-white hover:scale-105 hover:shadow-2xl'
+    ]"
   >
     <div class="flex justify-between items-start mb-4">
       <button
@@ -151,6 +154,10 @@ const props = defineProps({
     required: true,
   },
   isDelete: {
+    type: Boolean,
+    default: false,
+  },
+  isSelected: {
     type: Boolean,
     default: false,
   },

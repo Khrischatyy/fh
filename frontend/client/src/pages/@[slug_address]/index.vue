@@ -190,18 +190,19 @@
             </div>
           </div>
           <div v-if="address?.rooms.length > 0"
-               class="flex flex-col items-center w-full text-center">
-            <div class="flex gap-2 font-[BebasNeue] text-4xl text-white justify-center mt-5 items-center underline underline-offset-4 mb-5">
+               class="flex flex-col items-center w-full text-center mb-10">
+            <div class="flex gap-2 font-[BebasNeue] text-4xl text-white justify-center mt-5 items-center underline underline-offset-4 mb-4 underline-offset-8">
               ROOM:
             </div>
-            <div class="flex flex-row gap-4 justify-center w-full max-w-[1200px] overflow-x-auto">
+            <div class="flex flex-row gap-4 justify-start w-full max-w-[1200px] overflow-x-auto scrollbar-hide px-4 pb-6 pt-2">
               <div v-for="room in address?.rooms.filter(r => r.prices.length > 0)"
                    @click="chooseRoom(room.id)"
-                   class="flex-shrink-0 w-[150px] md:w-[250px] lg:w-[300px] h-[150px] md:h-[250px] lg:h-[300px]">
+                   class="flex-shrink-0 w-[200px] md:w-[280px] lg:w-[320px] h-[220px] md:h-[280px] lg:h-[320px] p-1">
                 <RoomCard
                     class="w-full h-full"
-                    :class="room.id === rentingForm.room_id ? 'border border-white' : 'border border-transparent'"
+                    :class="room.id === rentingForm.room_id ? 'selected' : ''"
                     :room="room"
+                    :is-selected="room.id === rentingForm.room_id"
                 />
               </div>
             </div>
@@ -211,7 +212,7 @@
               class="max-w-[212px] m-auto w-full justify-between gap-1.5 items-center flex-col text-center mb-10"
           >
             <div
-                class="underline underline-offset-4 flex gap-2 font-[BebasNeue] text-4xl text-white justify-center mt-10 md:mt-10 mb-2 items-center"
+                class="underline underline-offset-4 flex gap-2 font-[BebasNeue] text-4xl text-white justify-center mt-6 md:mt-10 mb-2 items-center mb-5 underline-offset-8"
             >
               Engineer:
             </div>
@@ -233,7 +234,7 @@
               class="max-w-[212px] m-auto w-full justify-between gap-1.5 items-center flex-col mb-10 text-center"
           >
             <div
-                class="underline underline-offset-4 flex gap-2 font-[BebasNeue] text-4xl text-white justify-center mb-2 items-center"
+                class="underline flex gap-2 font-[BebasNeue] text-4xl text-white justify-center mb-2 items-center mb-5 underline-offset-8"
             >
               Day:
             </div>
@@ -294,9 +295,9 @@
                 class="relative w-full max-w-[212px] flex flex-col items-center mt-10"
             >
               <div
-                  class="flex gap-2 font-[BebasNeue] text-4xl text-white justify-center mt-5 mb-2 items-center"
+                  class="flex gap-2 font-[BebasNeue] text-4xl text-white justify-center mt-5  items-center underline-offset-8 mb-5 underline"
               >
-                Start From
+                Start From:
               </div>
               <TimeSelect
                   :key="rentingForm.date"
@@ -318,9 +319,9 @@
                 class="relative w-full flex flex-col max-w-[212px] mb-10 items-center"
             >
               <div
-                  class="flex gap-2 font-[BebasNeue] text-4xl text-white justify-center mt-5 mb-2 items-center"
+                  class="underline flex gap-2 font-[BebasNeue] text-4xl text-white justify-center mt-8 items-center mb-5 underline-offset-8"
               >
-                To
+                To:
               </div>
               <TimeSelect
                   class="z-30"
@@ -335,7 +336,7 @@
           </div>
           <div
               :key="rentingForm.start_time.time"
-              v-if="calculatedPrice"
+              v-if="isBookingComplete"
               class="flex-col mb-14 relative justify-center items-center gap-1.5 flex animate__animated animate__fadeInDown"
           >
             <div
@@ -680,9 +681,6 @@ onMounted(async () => {
   photoContainer.value?.addEventListener("animationend", () => {
     mainContainer.value.style.overflow = "inherit"
   })
-  if (address?.value?.rooms?.length > 0) {
-    rentingForm.value.room_id = address?.value?.rooms[0].id
-  }
 })
 
 // Define isOwner computed property before using it
@@ -694,6 +692,13 @@ const customers = ref([])
 watch(() => address.value, (newAddress) => {
   if (newAddress && isOwner.value) {
     fetchCustomersForOwner()
+  }
+  // Auto-select first room with prices when address loads
+  if (newAddress) {
+    const roomsWithPrices = newAddress.rooms?.filter(r => r.prices.length > 0) || []
+    if (roomsWithPrices.length > 0 && !rentingForm.value.room_id) {
+      rentingForm.value.room_id = roomsWithPrices[0].id
+    }
   }
 }, { immediate: true })
 
@@ -769,6 +774,16 @@ async function getEndSlots(start_time: string) {
 }
 
 const calculatedPrice = ref({ total_price: 0, explanation: "" })
+
+// Computed property to check if all booking fields are filled
+const isBookingComplete = computed(() => {
+  return !!(
+    rentingForm.value.date &&
+    rentingForm.value.start_time?.time &&
+    rentingForm.value.end_time?.time &&
+    calculatedPrice.value?.total_price > 0
+  )
+})
 
 const chooseRoom = (roomId: string) => {
   rentingForm.value.room_id = roomId
@@ -1085,5 +1100,14 @@ select {
   top: 0;
   transition: height 0.1s ease-in-out;
   z-index: 1000;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
 }
 </style>
