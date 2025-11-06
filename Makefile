@@ -51,7 +51,8 @@ help:
 	@echo "  make prod-restart             - Restart all production services"
 	@echo "  make prod-restart-frontend    - Restart frontend only"
 	@echo "  make prod-restart-api         - Restart API only"
-	@echo "  make prod-rebuild-frontend    - Rebuild and restart frontend"
+	@echo "  make prod-update-frontend     - Quick frontend update with logs (recommended)"
+	@echo "  make prod-rebuild-frontend    - Full frontend rebuild with --no-cache"
 	@echo "  make status-prod              - Show production container status"
 	@echo "  make logs-prod-all            - View all production logs"
 	@echo "  make logs-prod-frontend       - View frontend logs"
@@ -297,11 +298,22 @@ prod-restart-caddy:
 	@echo "$(GREEN)✅ Caddy restarted!$(NC)"
 
 prod-rebuild-frontend:
-	@echo "$(YELLOW)Rebuilding and restarting frontend...$(NC)"
+	@echo "$(YELLOW)Rebuilding and restarting frontend (full rebuild with --no-cache)...$(NC)"
 	@docker-compose -f prod.yml stop frontend
 	@docker-compose -f prod.yml build --no-cache frontend
 	@docker-compose -f prod.yml up -d frontend
 	@echo "$(GREEN)✅ Frontend rebuilt and restarted!$(NC)"
+	@echo "$(BLUE)Tailing logs (Ctrl+C to exit)...$(NC)"
+	@docker-compose -f prod.yml logs -f frontend
+
+prod-update-frontend:
+	@echo "$(YELLOW)Updating frontend (quick rebuild)...$(NC)"
+	@docker-compose -f prod.yml stop frontend
+	@docker-compose -f prod.yml build frontend
+	@docker-compose -f prod.yml up -d frontend
+	@echo "$(GREEN)✅ Frontend updated and restarted!$(NC)"
+	@echo "$(BLUE)Tailing logs (Ctrl+C to exit)...$(NC)"
+	@docker-compose -f prod.yml logs -f frontend
 
 stop-prod:
 	@docker-compose -f prod.yml stop
