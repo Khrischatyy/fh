@@ -87,10 +87,10 @@ function handlePhoneAuthCancel() {
         <GoogleSignInButton />
 
         <!-- Phone Sign In Button (toggles inline form) -->
-        <PhoneSignInButton
-          v-if="!showPhoneAuth"
-          @click="showPhoneAuth = true"
-        />
+<!--        <PhoneSignInButton-->
+<!--          v-if="!showPhoneAuth"-->
+<!--          @click="showPhoneAuth = true"-->
+<!--        />-->
 
         <!-- Inline Phone Auth Form -->
         <PhoneAuthInput
