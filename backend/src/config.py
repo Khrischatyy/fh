@@ -111,6 +111,11 @@ class Settings(BaseSettings):
     # Sentry (optional)
     sentry_dsn: Optional[str] = None
 
+    # Admin Panel
+    admin_username: str = "admin"
+    admin_password: str = "change-this-admin-password-in-production"
+    admin_secret_key: str = "change-this-admin-secret-key-min-32-chars-long"
+
 
 @lru_cache()
 def get_settings() -> Settings:

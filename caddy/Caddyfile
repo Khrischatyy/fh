@@ -3,16 +3,23 @@
     email alex@funny-how.com
 }
 
-funny-how.com, www.funny-how.com {
+# Local development - explicit localhost binding (HTTP only, no TLS)
+http://localhost, http://127.0.0.1, http://0.0.0.0, :80 {
     # Enable logging
     log {
         output stdout
         format console
     }
 
-    # Let's Encrypt will automatically provision SSL certificates
+    # FastAPI endpoints - /api, /docs, /redoc, /openapi.json, /admin, /health
+    handle /health {
+        reverse_proxy api:8000
+    }
 
-    # FastAPI endpoints - /api, /docs, /redoc, /openapi.json
+    handle /api {
+        reverse_proxy api:8000
+    }
+
     handle /api/* {
         reverse_proxy api:8000
     }
@@ -30,6 +37,72 @@ funny-how.com, www.funny-how.com {
     }
 
     handle /openapi.json {
+        reverse_proxy api:8000
+    }
+
+    # Admin panel
+    handle /admin {
+        reverse_proxy api:8000
+    }
+
+    handle /admin/* {
+        reverse_proxy api:8000
+    }
+
+    # Socket.io chat service (WebSocket support)
+    handle /socket.io/* {
+        reverse_proxy chat:6001 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Forwarded-Host {host}
+        }
+    }
+
+    # Frontend (Nuxt) - handle all other requests
+    handle /* {
+        reverse_proxy frontend:3000
+    }
+}
+
+# Production domain (HTTPS with Let's Encrypt)
+funny-how.com, www.funny-how.com {
+    # Enable logging
+    log {
+        output stdout
+        format console
+    }
+
+    # Let's Encrypt will automatically provision SSL certificates
+
+    # FastAPI endpoints - /api, /docs, /redoc, /openapi.json, /admin
+    handle /api/* {
+        reverse_proxy api:8000
+    }
+
+    handle /docs {
+        reverse_proxy api:8000
+    }
+
+    handle /docs/* {
+        reverse_proxy api:8000
+    }
+
+    handle /redoc {
+        reverse_proxy api:8000
+    }
+
+    handle /openapi.json {
+        reverse_proxy api:8000
+    }
+
+    # Admin panel
+    handle /admin {
+        reverse_proxy api:8000
+    }
+
+    handle /admin/* {
         reverse_proxy api:8000
     }
 

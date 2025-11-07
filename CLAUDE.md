@@ -698,10 +698,17 @@ Express.js with Socket.io for real-time messaging. Connects to Redis and Postgre
 - Main app: http://127.0.0.1 or http://localhost
 - FastAPI backend: http://127.0.0.1/api (proxied via Caddy)
 - FastAPI docs: http://127.0.0.1/docs
+- **Admin panel**: http://127.0.0.1/admin (username: `admin`, password from `.env`)
 - Frontend dev: http://localhost:3000
 - Chat service: http://localhost:6001
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
+
+**Admin Panel:**
+- SQLAdmin interface for managing all database models (27 models)
+- Secured with basic HTTP auth (credentials in `.env`: `ADMIN_USERNAME`, `ADMIN_PASSWORD`)
+- Production: https://funny-how.com/admin
+- **Important**: Change default credentials in production!
 
 ## Important Notes
 

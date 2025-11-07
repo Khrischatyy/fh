@@ -10,10 +10,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import IntegrityError
+from starlette.middleware.sessions import SessionMiddleware
 import time
 
 from src.config import settings
-from src.database import init_db
+from src.database import init_db, engine
 from src.exceptions import (
     AppException,
     app_exception_handler,
@@ -99,6 +100,13 @@ app = FastAPI(
 
 # Store settings in app state
 app.state.settings = settings
+
+# Add session middleware for admin authentication
+app.add_middleware(SessionMiddleware, secret_key=settings.admin_secret_key)
+
+# Setup SQLAdmin
+from src.admin import setup_admin
+admin = setup_admin(app, engine)
 
 
 # Middleware

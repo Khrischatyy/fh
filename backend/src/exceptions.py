@@ -175,11 +175,14 @@ async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSON
 
 async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle all other exceptions."""
+    # Safely access debug setting (might not exist in SQLAdmin context)
+    debug = getattr(getattr(request.app.state, 'settings', None), 'debug', True)
+
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "error": True,
             "message": "Internal server error",
-            "detail": str(exc) if request.app.state.settings.debug else None,
+            "detail": str(exc) if debug else None,
         },
     )

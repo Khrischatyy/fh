@@ -41,7 +41,6 @@ class Message(Base, IDMixin, TimestampMixin):
 
     # Message content
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    subject: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Status
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

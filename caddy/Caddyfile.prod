@@ -59,6 +59,38 @@ funny-how.com www.funny-how.com {
         reverse_proxy api:8000
     }
 
+    # Admin panel (secured with basic HTTP auth at application level)
+    # Optional: Add IP whitelisting for extra security
+    # @admin_whitelist {
+    #     remote_ip 203.0.113.0/24  # Your office IP range
+    #     remote_ip 198.51.100.45   # Your home IP
+    # }
+    # handle /admin* {
+    #     @not_whitelisted not remote_ip 203.0.113.0/24 198.51.100.45
+    #     respond @not_whitelisted "Access Denied" 403
+    #     reverse_proxy api:8000 {
+    #         header_up X-Real-IP {remote_host}
+    #         header_up X-Forwarded-For {remote_host}
+    #         header_up X-Forwarded-Proto {scheme}
+    #     }
+    # }
+
+    handle /admin {
+        reverse_proxy api:8000 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    handle /admin/* {
+        reverse_proxy api:8000 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
     # Socket.io chat service
     handle /socket.io/* {
         reverse_proxy chat:6001 {

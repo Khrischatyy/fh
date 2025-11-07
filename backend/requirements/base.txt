@@ -60,3 +60,7 @@ slowapi==0.1.9
 
 # Monitoring (optional)
 sentry-sdk[fastapi]==1.39.2
+
+# Admin Panel
+sqladmin==0.16.1
+itsdangerous==2.2.0

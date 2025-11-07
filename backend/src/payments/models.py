@@ -76,16 +76,6 @@ class Payout(Base, IDMixin, TimestampMixin):
     currency: Mapped[str] = mapped_column(String(3), default="USD", nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False)  # pending, paid, failed, etc.
 
-    # Timestamps
-    arrival_date: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
-    paid_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
-
     # Relationships
     user: Mapped["User"] = relationship(
         "User",
@@ -131,20 +121,21 @@ class SquareToken(Base, IDMixin, TimestampMixin):
         Integer,
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
-        unique=True,
         index=True,
+    )
+    square_location_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("square_locations.id", ondelete="CASCADE"),
+        nullable=True,
     )
 
     # Token info
     access_token: Mapped[str] = mapped_column(String(500), nullable=False)
-    refresh_token: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    expires_at: Mapped[Optional[datetime]] = mapped_column(
+    refresh_token: Mapped[str] = mapped_column(String(500), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        nullable=True,
+        nullable=False,
     )
-
-    # Merchant info
-    merchant_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship(
