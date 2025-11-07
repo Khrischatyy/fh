@@ -27,7 +27,7 @@ class StripeGateway(PaymentGateway):
     def __init__(self, db_session):
         """Initialize Stripe gateway with database session."""
         self.db = db_session
-        stripe.api_key = settings.STRIPE_API_KEY
+        stripe.api_key = settings.stripe_api_key
 
     async def create_payment_session(
         self,
@@ -68,8 +68,8 @@ class StripeGateway(PaymentGateway):
                     'quantity': 1,
                 }],
                 mode='payment',
-                success_url=f"{settings.FRONTEND_URL}/payment-success?session_id={{CHECKOUT_SESSION_ID}}&booking_id={booking.id}",
-                cancel_url=f"{settings.FRONTEND_URL}/cancel-booking",
+                success_url=f"{settings.frontend_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}&booking_id={booking.id}",
+                cancel_url=f"{settings.frontend_url}/cancel-booking",
                 payment_intent_data={
                     'application_fee_amount': service_fee_cents,
                     'transfer_data': {
@@ -80,7 +80,7 @@ class StripeGateway(PaymentGateway):
                     'booking_id': str(booking.id),
                     'studio_owner_id': str(studio_owner.id),
                 },
-                expires_at=int((datetime.now() + timedelta(minutes=settings.TEMPORARY_PAYMENT_LINK_EXPIRY_MINUTES)).timestamp()),
+                expires_at=int((datetime.now() + timedelta(minutes=settings.temporary_payment_link_expiry_minutes)).timestamp()),
             )
 
             # Create charge record in database
@@ -98,7 +98,7 @@ class StripeGateway(PaymentGateway):
                 'payment_url': session.url,
             }
 
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             logger.error(f"Stripe error creating payment session: {str(e)}")
             raise BadRequestException(f"Payment session creation failed: {str(e)}")
         except Exception as e:
@@ -115,7 +115,7 @@ class StripeGateway(PaymentGateway):
             session = stripe.checkout.Session.retrieve(session_id)
             logger.info(f"Stripe session retrieved: {session_id}")
             return session
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             logger.error(f"Stripe error verifying session: {str(e)}")
             return None
 
@@ -249,7 +249,7 @@ class StripeGateway(PaymentGateway):
                 'message': 'Refund processed successfully.',
             }
 
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             logger.error(f"Stripe refund error: {str(e)}")
             return {
                 'success': False,
@@ -266,7 +266,7 @@ class StripeGateway(PaymentGateway):
             account = stripe.Account.retrieve(user.stripe_account_id)
             return account
 
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             logger.error(f"Error retrieving Stripe account: {str(e)}")
             raise BadRequestException(f"Failed to retrieve Stripe account: {str(e)}")
 
@@ -281,7 +281,7 @@ class StripeGateway(PaymentGateway):
             )
             return balance
 
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             logger.error(f"Error retrieving balance: {str(e)}")
             raise BadRequestException(f"Failed to retrieve balance: {str(e)}")
 
@@ -316,7 +316,7 @@ class StripeGateway(PaymentGateway):
                 'url': account_link.url,
             }
 
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             logger.error(f"Error creating Stripe account: {str(e)}")
             raise BadRequestException(f"Failed to create Stripe account: {str(e)}")
 
@@ -332,14 +332,14 @@ class StripeGateway(PaymentGateway):
                 'url': account_link.url,
             }
 
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             logger.error(f"Error refreshing account link: {str(e)}")
             raise BadRequestException(f"Failed to refresh account link: {str(e)}")
 
     async def _create_account_link(self, stripe_account_id: str):
         """Create Stripe AccountLink for onboarding."""
         # Use HTTPS for live mode
-        base_url = settings.FRONTEND_URL
+        base_url = settings.frontend_url
 
         return stripe.AccountLink.create(
             account=stripe_account_id,

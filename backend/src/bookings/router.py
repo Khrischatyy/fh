@@ -144,7 +144,6 @@ async def calculate_booking_price(
 
 @router.post(
     "/room/reservation",
-    response_model=CreateReservationResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create room reservation",
     description="Create a new room booking/reservation."
@@ -153,7 +152,7 @@ async def create_room_reservation(
     request: Annotated[CreateReservationRequest, Body()],
     service: Annotated[BookingService, Depends(get_booking_service)],
     current_user: Annotated[User, Depends(get_current_user)],
-) -> CreateReservationResponse:
+):
     """
     Create a new room reservation.
 
@@ -170,12 +169,13 @@ async def create_room_reservation(
     - **message**: Success message
     - **booking_id**: Created booking ID
     - **status**: Booking status (pending, confirmed, etc.)
+    - **payment_url**: Stripe checkout URL
 
     **Business Rules:**
     - User must be authenticated
     - Time slot must be available
     - Booking is created with "pending" status
-    - Payment link will be generated separately
+    - Payment link will be generated and returned
     """
     result = await service.create_reservation(
         user_id=current_user.id,
@@ -187,15 +187,21 @@ async def create_room_reservation(
         engineer_id=request.engineer_id
     )
 
-    return CreateReservationResponse(
-        message=result["message"],
-        booking_id=result["booking_id"],
-        status=result["status"],
-        payment_url=result["payment_url"],
-        session_id=result["session_id"],
-        total_price=result["total_price"],
-        expires_at=result["expires_at"]
-    )
+    # Return Laravel-compatible response format
+    return {
+        "success": True,
+        "data": {
+            "message": result["message"],
+            "booking_id": result["booking_id"],
+            "status": result["status"],
+            "payment_url": result["payment_url"],
+            "session_id": result["session_id"],
+            "total_price": result["total_price"],
+            "expires_at": result["expires_at"]
+        },
+        "message": result["message"],
+        "code": 201
+    }
 
 
 @router.post(

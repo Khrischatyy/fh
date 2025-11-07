@@ -11,13 +11,8 @@ class AvailableStartTimeRequest(BaseModel):
     room_id: int = Field(..., description="Room ID", gt=0)
     date: date_type = Field(..., description="Booking date in YYYY-MM-DD format")
 
-    @field_validator('date')
-    @classmethod
-    def validate_date(cls, v: date_type) -> date_type:
-        """Validate date is not in the past."""
-        if v < datetime.now().date():
-            raise ValueError("Date cannot be in the past")
-        return v
+    # Note: Date validation removed to avoid timezone issues
+    # The service layer validates using the studio's timezone
 
 
 class AvailableEndTimeRequest(BaseModel):
@@ -26,13 +21,8 @@ class AvailableEndTimeRequest(BaseModel):
     date: date_type = Field(..., description="Booking date in YYYY-MM-DD format")
     start_time: time_type = Field(..., description="Start time in HH:MM format")
 
-    @field_validator('date')
-    @classmethod
-    def validate_date(cls, v: date_type) -> date_type:
-        """Validate date is not in the past."""
-        if v < datetime.now().date():
-            raise ValueError("Date cannot be in the past")
-        return v
+    # Note: Date validation removed to avoid timezone issues
+    # The service layer validates using the studio's timezone
 
 
 class TimeSlot(BaseModel):
@@ -105,13 +95,8 @@ class CreateReservationRequest(BaseModel):
             return None
         return int(v)
 
-    @field_validator('date', 'end_date')
-    @classmethod
-    def validate_dates(cls, v: date_type) -> date_type:
-        """Validate dates are not in the past."""
-        if v < datetime.now().date():
-            raise ValueError("Date cannot be in the past")
-        return v
+    # Note: Date validation removed from schema to avoid timezone issues
+    # The service layer will validate dates using the studio's timezone
 
 
 class CreateReservationResponse(BaseModel):

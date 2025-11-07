@@ -513,9 +513,13 @@ class BookingService:
             # Update booking with payment link
             from datetime import timedelta
             from src.config import settings
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.info(f"Payment session created: {payment_session}")
 
             expiry_time = datetime.now() + timedelta(
-                minutes=settings.TEMPORARY_PAYMENT_LINK_EXPIRY_MINUTES
+                minutes=settings.temporary_payment_link_expiry_minutes
             )
 
             await self._repository.update_booking(booking, {
@@ -536,4 +540,7 @@ class BookingService:
         except Exception as e:
             # If payment session creation fails, we still have the booking
             # but without payment link
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Payment session error: {e.__class__.__name__}: {str(e)}", exc_info=True)
             raise BadRequestException(f"Failed to create payment session: {str(e)}")
