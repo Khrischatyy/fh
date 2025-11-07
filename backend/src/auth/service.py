@@ -151,7 +151,8 @@ class AuthService:
         random_password = secrets.token_urlsafe(12)
         hashed_password = self.hash_password(random_password)
 
-        # Create new user
+        # Create new user WITHOUT a role
+        # User will be redirected to /settings/role to choose between Artist or Studio Owner
         user = User(
             google_id=google_id,
             email=email,
@@ -160,7 +161,7 @@ class AuthService:
             password_hash=hashed_password,
             profile_photo=avatar,
             email_verified_at=datetime.utcnow(),
-            role="user",  # Default role for Google OAuth users
+            role=None,  # NO default role - user must choose
         )
 
         db.add(user)

@@ -27,6 +27,8 @@ services:
         - AXIOS_BASEURL=http://caddy
         - AXIOS_BASEURL_CLIENT=http://127.0.0.1
         - AXIOS_API_VERSION=/api
+        - NUXT_ENV_GOOGLE_MAPS_API=${GOOGLE_MAPS_API}
+        - GOOGLE_PLACES_API=${GOOGLE_PLACES_API_KEY}
     container_name: funny-how-frontend
     command: npm run dev
     volumes:
@@ -41,6 +43,8 @@ services:
       - AXIOS_BASEURL=http://caddy
       - AXIOS_BASEURL_CLIENT=http://127.0.0.1
       - AXIOS_API_VERSION=/api
+      - NUXT_ENV_GOOGLE_MAPS_API=${GOOGLE_MAPS_API}
+      - GOOGLE_PLACES_API=${GOOGLE_PLACES_API_KEY}
     networks:
       - funny-how-network
     restart: unless-stopped

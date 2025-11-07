@@ -91,7 +91,8 @@ class User(Base, IDMixin, TimestampMixin):
     password_hash: Mapped[Optional[str]] = mapped_column("hashed_password", String(255), nullable=True)
 
     # Role (Laravel Spatie Permission compatible)
-    role: Mapped[str] = mapped_column(String(15), nullable=False, default="user", server_default="user")
+    # Nullable to allow users (especially Google OAuth) to choose role after signup
+    role: Mapped[Optional[str]] = mapped_column(String(15), nullable=True, default=None)
 
     # Contact
     phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
