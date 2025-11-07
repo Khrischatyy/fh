@@ -1,14 +1,16 @@
 {
-    # Global options
-    auto_https off
+    # Global options - Let's Encrypt email for certificate notifications
+    email alex@funny-how.com
 }
 
-:80 {
+funny-how.com, www.funny-how.com {
     # Enable logging
     log {
         output stdout
         format console
     }
+
+    # Let's Encrypt will automatically provision SSL certificates
 
     # FastAPI endpoints - /api, /docs, /redoc, /openapi.json
     handle /api/* {
