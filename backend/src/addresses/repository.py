@@ -57,6 +57,8 @@ class AddressRepository:
         from src.rooms.models import Room, RoomPrice
         from src.companies.models import Company, AdminCompany
 
+        from src.auth.models import User, EngineerRate
+
         stmt = (
             select(Address)
             .where(Address.slug == slug)
@@ -66,6 +68,7 @@ class AddressRepository:
                 selectinload(Address.rooms).selectinload(Room.prices),
                 selectinload(Address.company).selectinload(Company.admin_companies).selectinload(AdminCompany.admin),
                 selectinload(Address.operating_hours),
+                selectinload(Address.engineers).selectinload(User.engineer_rate),
                 # TODO: Add equipment loading when table is created
                 # selectinload(Address.equipment).selectinload(Equipment.equipment_type),
                 selectinload(Address.city),

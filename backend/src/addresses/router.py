@@ -328,6 +328,26 @@ async def get_studio_by_slug(
         if addr_dict.get("longitude") is not None:
             addr_dict["longitude"] = str(addr_dict["longitude"])
 
+        # Add engineers data (team members)
+        engineers_list = []
+        for engineer in address.engineers:
+            engineers_list.append({
+                "id": engineer.id,
+                "name": engineer.name,
+                "firstname": engineer.firstname,
+                "lastname": engineer.lastname,
+                "username": engineer.username,
+                "email": engineer.email,
+                "phone": engineer.phone,
+                "profile_photo": engineer.profile_photo,
+                "role": engineer.role,
+                "engineer_rate": {
+                    "rate_per_hour": float(engineer.engineer_rate.rate_per_hour) if engineer.engineer_rate else None
+                } if engineer.engineer_rate else None,
+            })
+
+        addr_dict["engineers"] = engineers_list
+
         return addr_dict
 
 

@@ -139,7 +139,7 @@ backend/src/{domain}/
 - `geographic/` - Countries, cities reference data with studio filtering
 - `my_studios/` - Studio owner's studio management (list, filter, with completion status)
 - `tasks/` - Celery background tasks (email, bookings, payments)
-- `teams/` - Studio team members/engineers
+- `teams/` - Studio team members/engineers management (add, list, remove)
 - `storage.py` - Google Cloud Storage integration for media uploads
 - `gcs_utils.py` - GCS utility functions for generating proxy URLs
 
@@ -490,6 +490,167 @@ STRIPE_PUBLIC_KEY=pk_test_...
 STRIPE_API_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 ```
+
+### Teams Module - Studio Team Management
+
+Manages studio team members (engineers and managers) with roles and hourly rates.
+
+**User Roles:**
+- `studio_engineer` - Regular team member who can be assigned to bookings
+- `studio_manager` - Manager role with elevated permissions
+
+**Database Structure:**
+
+```sql
+-- Engineer hourly rates
+engineer_rates:
+  - id: BIGINT (PRIMARY KEY)
+  - user_id: BIGINT (references users.id, CASCADE)
+  - rate_per_hour: NUMERIC(8, 2)
+
+-- Many-to-many: Engineers assigned to studios
+engineer_addresses:
+  - id: BIGINT (PRIMARY KEY)
+  - user_id: BIGINT (references users.id, CASCADE)
+  - address_id: BIGINT (references addresses.id, CASCADE)
+  - created_at, updated_at: TIMESTAMP
+```
+
+**Key Models:**
+
+```python
+# backend/src/auth/models.py
+class EngineerRate(Base, IDMixin):
+    user_id: Mapped[int]
+    rate_per_hour: Mapped[float]  # Numeric(8,2)
+    user: Mapped["User"] = relationship("User", back_populates="engineer_rate")
+
+class User(Base, IDMixin, TimestampMixin):
+    role: Mapped[str]  # 'studio_engineer' or 'studio_manager'
+    engineer_rate: Mapped[Optional["EngineerRate"]] = relationship(...)
+    engineer_addresses: Mapped[list["Address"]] = relationship(...)
+
+# backend/src/addresses/models.py
+class Address(Base, IDMixin, TimestampMixin):
+    engineers: Mapped[list["User"]] = relationship(
+        "User",
+        secondary="engineer_addresses",
+        lazy="select",
+    )
+```
+
+**API Endpoints:**
+
+```http
+# List all team members for user's company
+GET /api/team/member
+Authorization: Bearer {token}
+Response: {
+  "success": true,
+  "data": [
+    {
+      "id": 18,
+      "username": "John Engineer",
+      "email": "john.engineer@example.com",
+      "role": "studio_engineer",
+      "roles": [{"name": "studio_engineer"}],  # Laravel Spatie format
+      "pivot": {"address_id": 16, "user_id": 18},
+      "engineerRate": {"rate_per_hour": 50.0},
+      "booking_count": 0
+    }
+  ]
+}
+
+# Add new team member
+POST /api/team/member
+Authorization: Bearer {token}
+Body: {
+  "name": "John Engineer",
+  "email": "john.engineer@example.com",
+  "address_id": 16,
+  "role": "studio_engineer",
+  "rate_per_hour": 50.00
+}
+
+# Remove team member from studio
+DELETE /api/team/member
+Authorization: Bearer {token}
+Body: {
+  "address_id": 16,
+  "member_id": 18
+}
+
+# Search engineers by email (autocomplete)
+GET /api/team/email/check?q={query}
+Authorization: Bearer {token}
+```
+
+**Team Member Creation Flow:**
+
+1. **Validation**: Email must be unique, role must be `studio_engineer` or `studio_manager`
+2. **User Creation**: Creates user with random 12-character password
+3. **Role Assignment**: Sets `user.role` field
+4. **Rate Storage**: Creates `EngineerRate` record with hourly rate
+5. **Studio Assignment**: Links user to address via `engineer_addresses` pivot table
+6. **TODO**: Send invitation email with password reset link
+
+**Authorization:**
+
+Team members can only be managed by the studio owner (user who owns the company that owns the address):
+```python
+# Check authorization
+company_id = address.company_id
+is_admin = await company_service.is_admin(company_id, current_user_id)
+```
+
+**Studio Detail with Engineers:**
+
+The `/api/address/studio/{slug}` endpoint includes engineers data:
+```json
+{
+  "id": 16,
+  "slug": "section-los-angeles-1",
+  "engineers": [
+    {
+      "id": 18,
+      "username": "John Engineer",
+      "role": "studio_engineer",
+      "engineer_rate": {
+        "rate_per_hour": 50.0
+      }
+    }
+  ]
+}
+```
+
+**Frontend Integration:**
+
+Engineers appear in booking forms on studio detail pages:
+```javascript
+// frontend/client/src/pages/@[slug_address]/index.vue
+const teammatesOptions = computed(() => {
+  // Filter only studio_engineer role (exclude managers)
+  const studioEngineers = address.value.engineers.filter(
+    (teammate) => teammate.role === 'studio_engineer'
+  );
+
+  // Map to FSelect options (username only, no price)
+  return [
+    { id: null, name: "No Engineer", label: "No Engineer" },
+    ...studioEngineers.map((eng) => ({
+      id: eng.id,
+      name: eng.username,
+      label: eng.username,
+    }))
+  ];
+});
+```
+
+**Important Notes:**
+- Engineers are filtered by role in frontend (`studio_engineer` only for bookings)
+- Hourly rate is stored but NOT displayed in booking dropdown
+- Team member list shows both engineers and managers
+- Removing a team member detaches from address but does NOT delete the user account
 
 ### Laravel Backend (laravel/) - Legacy
 
@@ -1086,6 +1247,48 @@ POST /api/address/{address_id}/badge
 Authorization: Bearer {token}
 Body: { "badge_id": 3 }
 ```
+
+### Team Management Endpoints
+
+**List team members:**
+```http
+GET /api/team/member
+Authorization: Bearer {token}
+```
+- Returns: All team members (engineers + managers) for user's company
+- Includes: `roles`, `pivot`, `engineerRate` data
+- Use case: Team management page
+
+**Add team member:**
+```http
+POST /api/team/member
+Authorization: Bearer {token}
+Body: {
+  "name": "John Engineer",
+  "email": "john.engineer@example.com",
+  "address_id": 16,
+  "role": "studio_engineer",
+  "rate_per_hour": 50.00
+}
+```
+- Creates user account with random password
+- Assigns to studio via engineer_addresses
+- Stores hourly rate in engineer_rates
+
+**Remove team member:**
+```http
+DELETE /api/team/member
+Authorization: Bearer {token}
+Body: { "address_id": 16, "member_id": 18 }
+```
+- Detaches user from studio (doesn't delete account)
+
+**Search engineers:**
+```http
+GET /api/team/email/check?q=john
+Authorization: Bearer {token}
+```
+- Autocomplete search for studio_engineer role users
 
 ### Media Proxy Endpoints
 

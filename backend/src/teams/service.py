@@ -9,7 +9,7 @@ from fastapi import HTTPException, status
 import secrets
 import string
 
-from src.auth.models import User, engineer_addresses
+from src.auth.models import User, EngineerRate, engineer_addresses
 from src.addresses.models import Address
 from src.companies.repository import CompanyRepository
 from src.companies.service import CompanyService
@@ -107,9 +107,13 @@ class TeamService:
         self.db.add(user)
         await self.db.flush()  # Get user ID
 
-        # Create engineer_rate record (simplified - store in user or separate table)
-        # In Laravel: $user->engineerRate()->create(['rate_per_hour' => $ratePerHour])
-        # For now, we'll need to add this field or create a separate table
+        # Create engineer_rate record
+        # Laravel: $user->engineerRate()->create(['rate_per_hour' => $ratePerHour])
+        engineer_rate = EngineerRate(
+            user_id=user.id,
+            rate_per_hour=rate_per_hour
+        )
+        self.db.add(engineer_rate)
 
         # Attach user to address (many-to-many via engineer_addresses)
         stmt = engineer_addresses.insert().values(user_id=user.id, address_id=address_id)
@@ -123,6 +127,80 @@ class TeamService:
         # In Laravel: Password::createToken($user) and SendStaffInvitationJob
 
         return user
+
+    async def list_members(self, company_id: int) -> List[Dict[str, Any]]:
+        """
+        List all team members for a company.
+
+        Gets all addresses (studios) for the company and returns all team members
+        attached to those addresses with their roles and rates.
+
+        Args:
+            company_id: Company ID
+
+        Returns:
+            List of team members with their details
+        """
+        from sqlalchemy.orm import selectinload
+
+        # Get all address IDs for this company
+        stmt = select(Address.id).where(Address.company_id == company_id)
+        result = await self.db.execute(stmt)
+        address_ids = [row[0] for row in result.all()]
+
+        if not address_ids:
+            return []
+
+        # Get all unique users attached to these addresses via engineer_addresses
+        stmt = (
+            select(User)
+            .join(engineer_addresses, User.id == engineer_addresses.c.user_id)
+            .where(engineer_addresses.c.address_id.in_(address_ids))
+            .options(selectinload(User.engineer_rate))
+            .distinct()
+        )
+        result = await self.db.execute(stmt)
+        users = result.scalars().all()
+
+        # Format response - Laravel compatible with roles array
+        staff_list = []
+        for user in users:
+            # Get the address_id for this user (get the first one for pivot data)
+            stmt = (
+                select(engineer_addresses.c.address_id)
+                .where(engineer_addresses.c.user_id == user.id)
+                .where(engineer_addresses.c.address_id.in_(address_ids))
+                .limit(1)
+            )
+            result = await self.db.execute(stmt)
+            address_id_row = result.first()
+            address_id = address_id_row[0] if address_id_row else None
+
+            staff_list.append({
+                "id": user.id,
+                "name": user.name,
+                "firstname": user.firstname,
+                "lastname": user.lastname,
+                "username": user.username,
+                "email": user.email,
+                "phone": user.phone,
+                "profile_photo": user.profile_photo,
+                "booking_count": 0,  # TODO: Calculate actual booking count
+                # Laravel Spatie Permission format: roles array with objects
+                "roles": [{"name": user.role}],
+                # Pivot data for address relationship
+                "pivot": {
+                    "address_id": address_id,
+                    "user_id": user.id,
+                },
+                # Engineer rate (Laravel: engineerRate relationship)
+                "engineerRate": {
+                    "rate_per_hour": float(user.engineer_rate.rate_per_hour) if user.engineer_rate else None,
+                } if user.engineer_rate else None,
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+            })
+
+        return staff_list
 
     async def check_member_email(self, query: str) -> List[Dict[str, str]]:
         """

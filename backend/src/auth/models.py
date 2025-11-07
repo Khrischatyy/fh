@@ -4,7 +4,7 @@ Defines User, Role, and Permission models with relationships.
 """
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import String, Boolean, DateTime, Integer, ForeignKey, Table, Column, Enum as SQLEnum
+from sqlalchemy import String, Boolean, DateTime, Integer, ForeignKey, Table, Column, Enum as SQLEnum, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 
@@ -17,6 +17,21 @@ if TYPE_CHECKING:
     from src.messages.models import Message
     from src.payments.models import Payout, SquareToken
     from src.addresses.models import Address
+
+
+class EngineerRate(Base, IDMixin):
+    """Engineer hourly rate model."""
+
+    __tablename__ = "engineer_rates"
+
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    rate_per_hour: Mapped[float] = mapped_column(Numeric(8, 2), nullable=False)
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="engineer_rate", lazy="joined")
+
+    def __repr__(self) -> str:
+        return f"<EngineerRate(user_id={self.user_id}, rate_per_hour={self.rate_per_hour})>"
 
 
 class UserRole(str, enum.Enum):
@@ -116,6 +131,7 @@ class User(Base, IDMixin, TimestampMixin):
     square_tokens: Mapped[list["SquareToken"]] = relationship("SquareToken", back_populates="user", lazy="select")
     favorite_addresses: Mapped[list["Address"]] = relationship("Address", secondary=favorite_studios, lazy="select")
     engineer_addresses: Mapped[list["Address"]] = relationship("Address", secondary=engineer_addresses, lazy="select")
+    engineer_rate: Mapped[Optional["EngineerRate"]] = relationship("EngineerRate", back_populates="user", lazy="select", uselist=False)
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email})>"

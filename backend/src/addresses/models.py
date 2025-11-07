@@ -137,11 +137,11 @@ class Address(Base, IDMixin, TimestampMixin):
     #     secondary="favorite_studios",
     #     back_populates="favorite_addresses",
     # )
-    # engineers: Mapped[list["User"]] = relationship(
-    #     "User",
-    #     secondary="engineer_addresses",
-    #     back_populates="engineer_addresses",
-    # )
+    engineers: Mapped[list["User"]] = relationship(
+        "User",
+        secondary="engineer_addresses",
+        lazy="select",
+    )
 
     def __repr__(self) -> str:
         return f"<Address(id={self.id}, name={self.name}, slug={self.slug})>"

@@ -491,11 +491,14 @@ const teammatesOptions = computed(() => {
   // Check if the address and engineers are defined
   const engineers = address?.value?.engineers ?? [];
 
-  // Map engineers to the desired format
-  const options = engineers.map((teammate) => ({
+  // Filter only studio engineers (exclude managers)
+  const studioEngineers = engineers.filter((teammate) => teammate.role === 'studio_engineer');
+
+  // Map engineers to the desired format (without price)
+  const options = studioEngineers.map((teammate) => ({
     id: teammate.id,
-    name: `${teammate.username} / $${teammate?.engineer_rate?.rate_per_hour}`,
-    label: `${teammate.username} / $${teammate?.engineer_rate?.rate_per_hour}`,
+    name: teammate.username,
+    label: teammate.username,
   }));
 
   // Add the first option "No Engineer"

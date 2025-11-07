@@ -3,6 +3,7 @@ Team router - Laravel-compatible endpoints for team member management.
 """
 from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import get_current_user
@@ -12,6 +13,71 @@ from src.teams.schemas import AddMemberRequest, DeleteTeamMemberRequest
 from src.teams.service import TeamService
 
 router = APIRouter(prefix="/team", tags=["Team"])
+
+
+@router.get("/member", status_code=status.HTTP_200_OK)
+async def list_team_members(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    List all team members for the user's company.
+
+    Laravel compatible: GET /api/team/member
+
+    Returns all staff members (engineers/managers) attached to any studio
+    owned by the user's company. Includes roles and hourly rates.
+
+    **Response:**
+    - List of team members with their details
+    """
+    try:
+        # Get user's company ID from admin_companies relationship
+        from sqlalchemy.orm import selectinload
+        from src.companies.models import AdminCompany
+
+        # Reload user with admin_companies relationship
+        stmt = select(User).where(User.id == current_user.id).options(selectinload(User.admin_companies))
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+
+        if not user or not user.admin_companies:
+            return {
+                "success": False,
+                "data": [],
+                "message": "No company found for this user.",
+                "code": 404
+            }
+
+        # Get first admin company (Laravel: $user->adminCompany->company_id)
+        company_id = user.admin_companies[0].company_id
+
+        service = TeamService(db)
+        staff = await service.list_members(company_id)
+
+        return {
+            "success": True,
+            "data": staff,
+            "message": "Staff members retrieved successfully.",
+            "code": 200
+        }
+
+    except Exception as e:
+        status_code = getattr(e, "status_code", 500)
+        detail = getattr(e, "detail", str(e))
+
+        # Handle both dict and string detail formats
+        if isinstance(detail, dict):
+            message = detail.get("message", str(e))
+        else:
+            message = detail if isinstance(detail, str) else str(e)
+
+        return {
+            "success": False,
+            "data": [],
+            "message": message,
+            "code": status_code
+        }
 
 
 @router.post("/member", status_code=status.HTTP_200_OK)
@@ -63,12 +129,18 @@ async def add_team_member(
 
     except Exception as e:
         status_code = getattr(e, "status_code", 500)
-        detail = getattr(e, "detail", {"message": str(e), "errors": {}})
+        detail = getattr(e, "detail", str(e))
+
+        # Handle both dict and string detail formats
+        if isinstance(detail, dict):
+            message = detail.get("message", str(e))
+        else:
+            message = detail if isinstance(detail, str) else str(e)
 
         return {
             "success": False,
             "data": None,
-            "message": detail.get("message", str(e)),
+            "message": message,
             "code": status_code
         }
 
@@ -144,11 +216,17 @@ async def remove_team_member(
 
     except Exception as e:
         status_code = getattr(e, "status_code", 500)
-        detail = getattr(e, "detail", {"message": str(e), "errors": {}})
+        detail = getattr(e, "detail", str(e))
+
+        # Handle both dict and string detail formats
+        if isinstance(detail, dict):
+            message = detail.get("message", str(e))
+        else:
+            message = detail if isinstance(detail, str) else str(e)
 
         return {
             "success": False,
             "data": None,
-            "message": detail.get("message", str(e)),
+            "message": message,
             "code": status_code
         }
