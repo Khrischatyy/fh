@@ -20,6 +20,7 @@ from src.addresses.schemas import (
     AddBadgeRequest,
     MapStudioResponse,
 )
+from src.payments.schemas import PaymentSuccessRequest
 from src.addresses.service import AddressService
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
@@ -721,3 +722,116 @@ async def get_map_studios(
         response_studios.append(MapStudioResponse.model_validate(studio_dict))
 
     return response_studios
+
+
+@address_router.post(
+    "/payment-success",
+    status_code=status.HTTP_200_OK,
+    summary="Confirm payment success",
+    description="Verify and process successful payment after Stripe redirect (POST version)."
+)
+async def confirm_payment_success_post(
+    request_data: PaymentSuccessRequest,
+) -> dict:
+    """
+    Confirm and process successful payment (POST endpoint).
+
+    Matches Laravel: POST /api/address/payment-success
+
+    **Request Body:**
+    - **session_id**: Stripe checkout session ID
+    - **booking_id**: Booking ID
+
+    **Returns:**
+    - **success**: Payment confirmation status
+    - **message**: Success/error message
+    - **booking_id**: Booking ID
+
+    **Business Rules:**
+    - Verifies payment session with Stripe
+    - Updates booking status to confirmed
+    - Updates charge record
+    - Updates studio balance
+    - Sends confirmation emails
+    """
+    from src.payments.service import PaymentService
+    from src.exceptions import NotFoundException, BadRequestException
+
+    # Get database session
+    from src.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        try:
+            # Get booking to find studio owner
+            from src.bookings.repository import BookingRepository
+            from sqlalchemy import select
+            from sqlalchemy.orm import selectinload
+            from src.bookings.models import Booking
+            from src.companies.models import AdminCompany
+            from src.rooms.models import Room
+            from src.addresses.models import Address
+            from src.companies.models import Company
+
+            booking_repo = BookingRepository(db)
+            booking = await booking_repo.get_booking_by_id(request_data.booking_id)
+
+            if not booking:
+                raise NotFoundException("Booking not found")
+
+            # Get studio owner - load full booking with relationships
+            stmt = (
+                select(Booking)
+                .where(Booking.id == request_data.booking_id)
+                .options(
+                    selectinload(Booking.room)
+                    .selectinload(Room.address)
+                    .selectinload(Address.company)
+                )
+            )
+            result = await db.execute(stmt)
+            booking_full = result.scalar_one_or_none()
+
+            if not booking_full or not booking_full.room or not booking_full.room.address or not booking_full.room.address.company:
+                raise BadRequestException("Studio company not found")
+
+            # Get admin/owner
+            stmt_admin = (
+                select(AdminCompany)
+                .where(AdminCompany.company_id == booking_full.room.address.company_id)
+                .options(selectinload(AdminCompany.admin))
+            )
+            result_admin = await db.execute(stmt_admin)
+            admin_company = result_admin.scalar_one_or_none()
+
+            if not admin_company or not admin_company.admin:
+                raise BadRequestException("Studio owner not found")
+
+            studio_owner = admin_company.admin
+
+            # Process payment
+            payment_service = PaymentService(db)
+
+            result = await payment_service.process_payment_success(
+                session_id=request_data.session_id,
+                booking_id=request_data.booking_id,
+                gateway_name=studio_owner.payment_gateway or 'stripe',
+                studio_owner=studio_owner
+            )
+
+            # Commit transaction
+            await db.commit()
+
+            return {
+                "success": result['success'],
+                "message": result.get('message') or result.get('error', 'Unknown error'),
+                "booking_id": request_data.booking_id,
+                "redirect_url": "/bookings"
+            }
+
+        except Exception as e:
+            await db.rollback()
+            return {
+                "success": False,
+                "message": str(e),
+                "booking_id": request_data.booking_id,
+                "redirect_url": "/bookings"
+            }

@@ -23,8 +23,7 @@ class BookingStatus(Base, IDMixin, TimestampMixin):
     __tablename__ = "booking_statuses"
 
     # Basic info
-    name: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
-    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
 
     # Relationships
     bookings: Mapped[list["Booking"]] = relationship(

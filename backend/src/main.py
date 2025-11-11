@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import IntegrityError
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 import time
 
 from src.config import settings
@@ -100,6 +102,9 @@ app = FastAPI(
 
 # Store settings in app state
 app.state.settings = settings
+
+# Add proxy headers middleware (must be first to handle X-Forwarded-* headers)
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 # Add session middleware for admin authentication
 app.add_middleware(SessionMiddleware, secret_key=settings.admin_secret_key)

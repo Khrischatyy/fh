@@ -29,13 +29,15 @@ admin.funny-how.com {
     # }
     # respond @not_whitelisted "Access Denied" 403
 
-    # All requests on admin subdomain go to admin panel
-    handle /* {
-        reverse_proxy api:8000 {
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
-        }
+    # Redirect root to /admin/
+    @root path /
+    redir @root /admin/ permanent
+
+    # All requests go to admin panel
+    reverse_proxy api:8000 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
     }
 }
 

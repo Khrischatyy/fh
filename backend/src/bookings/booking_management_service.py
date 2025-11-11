@@ -137,9 +137,9 @@ class BookingManagementService:
         per_page: int = 15
     ) -> Dict[str, Any]:
         """
-        Filter future bookings with pagination (Laravel-compatible).
+        Filter all bookings with pagination (Laravel-compatible).
 
-        Returns bookings where start datetime >= NOW.
+        Returns all bookings (both past and future).
 
         Args:
             user_id: Current user ID
@@ -155,7 +155,7 @@ class BookingManagementService:
         """
         return await self._filter_bookings_base(
             user_id=user_id,
-            booking_type="future",
+            booking_type="all",
             status=status,
             date=date,
             time=time,
@@ -231,12 +231,7 @@ class BookingManagementService:
 
         if admin_company:
             # Also include bookings at this user's studios
-            conditions.append(
-                and_(
-                    Room.address_id == Address.id,
-                    Address.company_id == admin_company.company_id
-                )
-            )
+            conditions.append(Address.company_id == admin_company.company_id)
 
         stmt = (
             select(Booking)
@@ -263,7 +258,7 @@ class BookingManagementService:
                     )
                 )
             )
-        else:  # history
+        elif booking_type == "history":
             # Past bookings: date < today OR (date = today AND start_time < now)
             stmt = stmt.where(
                 or_(
@@ -274,6 +269,7 @@ class BookingManagementService:
                     )
                 )
             )
+        # else: booking_type == "all" - no time filter applied
 
         # Apply optional filters
         if status:
@@ -305,6 +301,9 @@ class BookingManagementService:
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total_result = await self._session.execute(count_stmt)
         total = total_result.scalar()
+
+        # Order by date and time descending (most recent first)
+        stmt = stmt.order_by(Booking.date.desc(), Booking.start_time.desc())
 
         # Apply pagination
         offset = (page - 1) * per_page
@@ -370,9 +369,13 @@ class BookingManagementService:
 
             bookings_data.append(booking_dict)
 
+        # Calculate last page (Laravel pagination format)
+        last_page = (total + per_page - 1) // per_page if total > 0 else 1
+
         return {
             "current_page": page,
             "data": bookings_data,
             "per_page": per_page,
-            "total": total
+            "total": total,
+            "last_page": last_page
         }

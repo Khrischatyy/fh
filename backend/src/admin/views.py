@@ -331,7 +331,7 @@ class BookingStatusAdmin(ModelView, model=BookingStatus):
     icon = "fa-solid fa-circle-check"
     category = "Bookings"
 
-    column_list = [BookingStatus.id, BookingStatus.name, BookingStatus.description]
+    column_list = [BookingStatus.id, BookingStatus.name]
     column_searchable_list = [BookingStatus.name]
 
     form_excluded_columns = [BookingStatus.created_at, BookingStatus.updated_at, BookingStatus.bookings]

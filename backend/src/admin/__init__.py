@@ -45,11 +45,12 @@ def setup_admin(app, engine):
     # Create authentication backend
     authentication_backend = BasicAuthBackend(secret_key=settings.admin_secret_key)
 
-    # Initialize admin
+    # Initialize admin with proper base URL for HTTPS
     admin = Admin(
         app,
         engine,
         title="Funny How Admin",
+        base_url="/admin",
         authentication_backend=authentication_backend,
     )
 
