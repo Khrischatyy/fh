@@ -124,15 +124,16 @@ class User(Base, IDMixin, TimestampMixin):
     two_factor_confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Relationships
-    bookings: Mapped[list["Booking"]] = relationship("Booking", back_populates="user", lazy="select", cascade="all, delete-orphan")
-    sent_messages: Mapped[list["Message"]] = relationship("Message", back_populates="sender", lazy="select", foreign_keys="Message.sender_id", cascade="all, delete-orphan")
-    received_messages: Mapped[list["Message"]] = relationship("Message", back_populates="recipient", lazy="select", foreign_keys="Message.recipient_id", cascade="all, delete-orphan")
-    payouts: Mapped[list["Payout"]] = relationship("Payout", back_populates="user", lazy="select", cascade="all, delete-orphan")
-    admin_companies: Mapped[list["AdminCompany"]] = relationship("AdminCompany", back_populates="admin", lazy="select", cascade="all, delete-orphan")
-    square_tokens: Mapped[list["SquareToken"]] = relationship("SquareToken", back_populates="user", lazy="select", cascade="all, delete-orphan")
+    bookings: Mapped[list["Booking"]] = relationship("Booking", back_populates="user", lazy="select")
+    sent_messages: Mapped[list["Message"]] = relationship("Message", back_populates="sender", lazy="select", foreign_keys="Message.sender_id")
+    received_messages: Mapped[list["Message"]] = relationship("Message", back_populates="recipient", lazy="select", foreign_keys="Message.recipient_id")
+    payouts: Mapped[list["Payout"]] = relationship("Payout", back_populates="user", lazy="select")
+    admin_companies: Mapped[list["AdminCompany"]] = relationship("AdminCompany", back_populates="admin", lazy="select")
+    square_tokens: Mapped[list["SquareToken"]] = relationship("SquareToken", back_populates="user", lazy="select")
     favorite_addresses: Mapped[list["Address"]] = relationship("Address", secondary=favorite_studios, lazy="select")
     engineer_addresses: Mapped[list["Address"]] = relationship("Address", secondary=engineer_addresses, lazy="select")
     engineer_rate: Mapped[Optional["EngineerRate"]] = relationship("EngineerRate", back_populates="user", lazy="select", uselist=False, cascade="all, delete-orphan")
+    devices: Mapped[list["Device"]] = relationship("Device", back_populates="user", lazy="select")
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email})>"

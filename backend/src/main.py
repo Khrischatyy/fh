@@ -35,6 +35,7 @@ from src.rooms.models import Room  # noqa: F401
 from src.bookings.models import Booking  # noqa: F401
 from src.messages.models import Message  # noqa: F401
 from src.payments.models import Charge, Payout, SquareLocation, SquareToken  # noqa: F401
+from src.devices.models import Device, DeviceLog  # noqa: F401
 
 # Import routers
 from src.auth.router import router as auth_router  # Custom Laravel-compatible auth
@@ -274,6 +275,10 @@ app.include_router(menu_router, prefix=settings.api_prefix)
 # Messages/Chat router
 from src.messages.router import router as messages_router
 app.include_router(messages_router, prefix=settings.api_prefix)
+
+# Devices router
+from src.devices.router import router as devices_router
+app.include_router(devices_router, prefix=settings.api_prefix)
 
 
 if __name__ == "__main__":

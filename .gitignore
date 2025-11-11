@@ -147,3 +147,7 @@ laravel
 # Docker
 *.env.local
 docker-compose.override.yml
+
+# Locker project (separate repo, development only)
+/locker/
+locker/*

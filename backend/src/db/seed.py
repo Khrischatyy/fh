@@ -11,6 +11,7 @@ from src.rooms.models import Room
 from src.bookings.models import Booking
 from src.messages.models import Message
 from src.payments.models import Charge, Payout
+from src.devices.models import Device, DeviceLog
 
 from src.database import AsyncSessionLocal
 from src.db.seeders.role_seeder import seed_roles

@@ -77,7 +77,9 @@ import {
   IconHistory,
   IconClose,
   IconCredit,
-  IconDollar, IconTeam,
+  IconDollar,
+  IconTeam,
+  IconMonitor,
 } from "~/src/shared/ui/common"
 
 const sideMenuTemplate: MenuItem[] = [
@@ -135,6 +137,13 @@ const sideMenuTemplate: MenuItem[] = [
     icon: IconDollar,
     path: "/icons/dollar.svg",
     link: "/payout",
+    role: STUDIO_OWNER_ROLE,
+  },
+  {
+    name: "Devices",
+    icon: IconMonitor,
+    path: "/icons/monitor.svg",
+    link: "/devices",
     role: STUDIO_OWNER_ROLE,
   },
   {
