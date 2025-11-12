@@ -544,3 +544,196 @@ class BookingService:
             logger = logging.getLogger(__name__)
             logger.error(f"Payment session error: {e.__class__.__name__}: {str(e)}", exc_info=True)
             raise BadRequestException(f"Failed to create payment session: {str(e)}")
+
+    async def get_booking_detail(self, booking_id: int, current_user_id: int):
+        """Get booking detail with all relationships."""
+        booking = await self._repository.get_booking_with_relations(booking_id)
+
+        if not booking:
+            raise NotFoundException(f"Booking with id {booking_id} not found")
+
+        # Check authorization: user owns the booking OR user owns the studio
+        is_authorized = booking.user_id == current_user_id
+
+        if not is_authorized and booking.room and booking.room.address:
+            # Check if current user owns the studio
+            from src.companies.service import CompanyService
+            from src.companies.repository import CompanyRepository
+            company_repository = CompanyRepository(self._repository._session)
+            company_service = CompanyService(company_repository)
+            is_authorized = await company_service.is_admin(
+                booking.room.address.company_id,
+                current_user_id
+            )
+
+        if not is_authorized:
+            from src.exceptions import ForbiddenException
+            raise ForbiddenException("You don't have permission to view this booking")
+
+        # Build response
+        device_data = None
+        if booking.device:
+            device_data = {
+                "id": booking.device.id,
+                "name": booking.device.name,
+                "is_active": booking.device.is_active,
+                "is_blocked": booking.device.is_blocked
+            }
+
+        room_data = None
+        if booking.room:
+            room_data = {
+                "id": booking.room.id,
+                "name": booking.room.name,
+                "address": {
+                    "id": booking.room.address.id,
+                    "street": booking.room.address.street,
+                    "company": {
+                        "id": booking.room.address.company.id,
+                        "name": booking.room.address.company.name
+                    } if booking.room.address.company else None
+                } if booking.room.address else None
+            }
+
+        status_data = None
+        if booking.status:
+            status_data = {
+                "id": booking.status.id,
+                "name": booking.status.name
+            }
+
+        user_data = None
+        if booking.user:
+            user_data = {
+                "id": booking.user.id,
+                "username": booking.user.username,
+                "email": booking.user.email
+            }
+
+        return {
+            "id": booking.id,
+            "room_id": booking.room_id,
+            "user_id": booking.user_id,
+            "status_id": booking.status_id,
+            "device_id": booking.device_id,
+            "date": booking.date.isoformat(),
+            "start_time": booking.start_time.strftime("%H:%M"),
+            "end_time": booking.end_time.strftime("%H:%M"),
+            "end_date": booking.end_date.isoformat() if booking.end_date else None,
+            "device": device_data,
+            "room": room_data,
+            "status": status_data,
+            "user": user_data,
+            "created_at": booking.created_at.isoformat(),
+            "updated_at": booking.updated_at.isoformat()
+        }
+
+    async def update_booking(
+        self,
+        booking_id: int,
+        current_user_id: int,
+        update_data: dict
+    ):
+        """Update booking fields."""
+        booking = await self._repository.get_booking_with_relations(booking_id)
+
+        if not booking:
+            raise NotFoundException(f"Booking with id {booking_id} not found")
+
+        # Check authorization: only studio owner can update
+        if booking.room and booking.room.address:
+            from src.companies.service import CompanyService
+            from src.companies.repository import CompanyRepository
+            company_repository = CompanyRepository(self._repository._session)
+            company_service = CompanyService(company_repository)
+            is_authorized = await company_service.is_admin(
+                booking.room.address.company_id,
+                current_user_id
+            )
+
+            if not is_authorized:
+                from src.exceptions import ForbiddenException
+                raise ForbiddenException("Only studio owners can update bookings")
+
+        # Convert date strings to date objects if provided
+        if "date" in update_data and update_data["date"]:
+            if isinstance(update_data["date"], str):
+                from datetime import datetime
+                update_data["date"] = datetime.strptime(update_data["date"], "%Y-%m-%d").date()
+
+        if "end_date" in update_data and update_data["end_date"]:
+            if isinstance(update_data["end_date"], str):
+                from datetime import datetime
+                update_data["end_date"] = datetime.strptime(update_data["end_date"], "%Y-%m-%d").date()
+
+        # Convert time strings to time objects if provided
+        if "start_time" in update_data and update_data["start_time"]:
+            if isinstance(update_data["start_time"], str):
+                from datetime import time as time_type
+                parts = update_data["start_time"].split(":")
+                hour = int(parts[0])
+                minute = int(parts[1])
+                second = int(parts[2]) if len(parts) > 2 else 0
+                update_data["start_time"] = time_type(hour=hour, minute=minute, second=second)
+
+        if "end_time" in update_data and update_data["end_time"]:
+            if isinstance(update_data["end_time"], str):
+                from datetime import time as time_type
+                parts = update_data["end_time"].split(":")
+                hour = int(parts[0])
+                minute = int(parts[1])
+                second = int(parts[2]) if len(parts) > 2 else 0
+                update_data["end_time"] = time_type(hour=hour, minute=minute, second=second)
+
+        # Update booking
+        updated_booking = await self._repository.update_booking(booking, update_data)
+
+        return await self.get_booking_detail(updated_booking.id, current_user_id)
+
+    async def get_available_devices(self, booking_id: int, current_user_id: int):
+        """Get available devices for a booking (studio owner's devices)."""
+        booking = await self._repository.get_booking_with_relations(booking_id)
+
+        if not booking:
+            raise NotFoundException(f"Booking with id {booking_id} not found")
+
+        # Get studio owner
+        if not booking.room or not booking.room.address:
+            return []
+
+        from src.companies.service import CompanyService
+        from src.companies.repository import CompanyRepository
+        company_repository = CompanyRepository(self._repository._session)
+        company_service = CompanyService(company_repository)
+
+        # Check authorization
+        is_authorized = await company_service.is_admin(
+            booking.room.address.company_id,
+            current_user_id
+        )
+
+        if not is_authorized:
+            from src.exceptions import ForbiddenException
+            raise ForbiddenException("Only studio owners can view available devices")
+
+        # Get studio owner ID
+        studio_owner_id = await company_service.get_company_admin_id(
+            booking.room.address.company_id
+        )
+
+        if not studio_owner_id:
+            return []
+
+        # Get all active, non-blocked devices for the studio owner
+        devices = await self._repository.get_user_devices(studio_owner_id)
+
+        return [
+            {
+                "id": device.id,
+                "name": device.name,
+                "is_active": device.is_active,
+                "is_blocked": device.is_blocked,
+                "last_heartbeat": device.last_heartbeat.isoformat() if device.last_heartbeat else None
+            }
+            for device in devices
+        ]

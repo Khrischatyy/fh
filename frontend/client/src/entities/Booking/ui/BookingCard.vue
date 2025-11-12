@@ -25,7 +25,7 @@
       </div>
       <div class="flex items-center gap-3 cursor-pointer hover:opacity-70">
         <IconLike
-          @click="toggleFavorite"
+          @click.stop="toggleFavorite"
           :icon-active="booking?.room?.address.is_favorite"
           :icon-color="booking?.room?.address.is_favorite ? '#FD9302' : 'white'"
         />
@@ -61,30 +61,11 @@
       </div>
     </div>
     <button
-      v-if="booking.status.id == BookingStatus.Paid"
-      @click="manageBookingPopup"
+      @click.stop="manageBookingPopup"
       class="w-full h-11 hover:opacity-90 bg-white rounded-[10px] text-neutral-900 text-sm font-medium tracking-wide"
     >
       Manage Booking
     </button>
-    <button
-      v-if="
-        booking.status.id == BookingStatus.Pending &&
-        booking?.user_id == user?.id &&
-        booking?.temporary_payment_link
-      "
-      @click="goToPay(booking?.temporary_payment_link)"
-      class="w-full h-11 hover:opacity-90 border border-red-500 rounded-[10px] text-red-500 bg-red-500 bg-opacity-5 text-sm font-medium tracking-wide"
-    >
-      Pay
-    </button>
-    <ManageBookingModal
-      v-if="showPopup"
-      @on-cancel-booking="handleCancelBooking"
-      :showPopup="showPopup"
-      :booking="booking"
-      @closePopup="closePopup"
-    />
   </div>
 </template>
 
@@ -92,40 +73,22 @@
 import {
   IconCalendar,
   IconClock,
-  IconLeft,
   IconLike,
-  IconRight,
 } from "~/src/shared/ui/common"
-import { BookingStatus } from "~/src/shared/utils"
-import { ManageBookingModal } from "~/src/widgets/Modals"
-import { ref } from "vue"
 import { getStatus, getColor, getColorHex } from "~/src/shared/utils"
 import IconAddress from "~/src/shared/ui/common/Icon/IconAddress.vue"
 import { Clipboard } from "~/src/shared/ui/common/Clipboard"
 import defaultLogo from "~/src/shared/assets/image/studio.png"
 import { useApi } from "~/src/lib/api"
-import { useSessionStore } from "~/src/entities/Session"
-import { storeToRefs } from "pinia"
-const showPopup = ref(false)
-const session = useSessionStore()
-const { user } = storeToRefs(session)
-// const user = session.getUser()
+
 const emit = defineEmits<{
   (e: "onCancelBooking"): void
   (e: "onFavoriteChange", bookingId: number): void
+  (e: "manageBooking", booking: any): void
 }>()
 
-const closePopup = () => {
-  showPopup.value = false
-}
 const manageBookingPopup = () => {
-  showPopup.value = true
-}
-const handleCancelBooking = (bookings) => {
-  emit("onCancelBooking", bookings)
-}
-const goToPay = (url) => {
-  window.location.href = url
+  emit("manageBooking", props.booking)
 }
 
 const toggleFavorite = () => {

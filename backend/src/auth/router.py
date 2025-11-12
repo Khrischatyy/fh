@@ -552,3 +552,31 @@ async def update_profile_information(
         "message": "Profile information updated successfully",
         "user": schemas.UserResponse.model_validate(updated_user)
     }
+
+
+@router.post("/generate-device-token", response_model=schemas.DeviceRegistrationTokenResponse)
+async def generate_device_registration_token(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generate a device registration token for Mac OS locker app.
+
+    This endpoint is used by the web app to generate a token that can be
+    copied and pasted into the locker app for device registration.
+
+    The token is valid for 24 hours and can only be used once.
+
+    Returns:
+    - **token**: Registration token to paste in locker app
+    - **expires_at**: Token expiration time
+    """
+    registration_token = await auth_service.generate_device_registration_token(
+        db,
+        current_user.id
+    )
+
+    return schemas.DeviceRegistrationTokenResponse(
+        token=registration_token.token,
+        expires_at=registration_token.expires_at,
+    )

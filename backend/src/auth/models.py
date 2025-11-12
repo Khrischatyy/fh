@@ -77,6 +77,24 @@ class PasswordResetToken(Base):
         return f"<PasswordResetToken(email={self.email})>"
 
 
+class DeviceRegistrationToken(Base, IDMixin, TimestampMixin):
+    """Device registration token for locker app."""
+
+    __tablename__ = "device_registration_tokens"
+
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    is_used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    device_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Relationship
+    user: Mapped["User"] = relationship("User", lazy="select")
+
+    def __repr__(self) -> str:
+        return f"<DeviceRegistrationToken(id={self.id}, user_id={self.user_id}, is_used={self.is_used})>"
+
+
 class User(Base, IDMixin, TimestampMixin):
     """User model for authentication and profile."""
 

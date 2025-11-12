@@ -111,3 +111,11 @@ class CompanyRepository:
         )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none() is not None
+
+    async def get_company_admin_id(self, company_id: int) -> Optional[int]:
+        """Get the admin user ID for a company."""
+        stmt = select(AdminCompany.admin_id).where(
+            AdminCompany.company_id == company_id,
+        ).limit(1)
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()

@@ -183,3 +183,39 @@ class BookingRepository:
         result = await self._session.execute(stmt, {"engineer_id": engineer_id})
         row = result.fetchone()
         return row[0] if row else None
+
+    async def get_booking_with_relations(self, booking_id: int) -> Optional[Booking]:
+        """Get booking with all relationships (device, status, user, room)."""
+        from src.devices.models import Device
+        from src.auth.models import User
+
+        stmt = (
+            select(Booking)
+            .where(Booking.id == booking_id)
+            .options(
+                selectinload(Booking.device),
+                selectinload(Booking.status),
+                selectinload(Booking.user),
+                selectinload(Booking.room).selectinload(Room.address).selectinload(Address.company),
+            )
+        )
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_user_devices(self, user_id: int) -> list:
+        """Get all active, non-blocked devices for a user (studio owner)."""
+        from src.devices.models import Device
+
+        stmt = (
+            select(Device)
+            .where(
+                and_(
+                    Device.user_id == user_id,
+                    Device.is_active == True,
+                    Device.is_blocked == False
+                )
+            )
+            .order_by(Device.name)
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())

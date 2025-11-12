@@ -727,14 +727,6 @@ make migrate-create message="description"
 make migrate-down
 ```
 
-**Laravel (laravel/):**
-```bash
-cd laravel
-php artisan migrate
-php artisan migrate:rollback
-php artisan migrate:status
-```
-
 ### Testing
 
 **FastAPI:**

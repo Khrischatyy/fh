@@ -149,3 +149,56 @@ class PaginatedBookingsResponse(BaseModel):
     data: list[dict]  # Use dict to allow flexible structure
     per_page: int
     total: int
+
+
+# Booking Management Schemas
+
+class DeviceSimple(BaseModel):
+    """Simple device response for bookings."""
+    id: int
+    name: str
+    is_active: bool
+    is_blocked: bool
+
+    model_config = {"from_attributes": True}
+
+
+class BookingDetailResponse(BaseModel):
+    """Detailed booking response with all relationships."""
+    id: int
+    room_id: int
+    user_id: int
+    status_id: int
+    device_id: Optional[int]
+    date: date_type
+    start_time: time_type
+    end_time: time_type
+    end_date: Optional[date_type]
+    temporary_payment_link: Optional[str]
+    temporary_payment_link_expires_at: Optional[datetime]
+    device: Optional[DeviceSimple] = None
+    room: Optional[dict] = None
+    status: Optional[dict] = None
+    user: Optional[dict] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UpdateBookingRequest(BaseModel):
+    """Update booking request."""
+    date: Optional[date_type] = Field(None, description="New booking date")
+    start_time: Optional[str] = Field(None, description="New start time (HH:MM)")
+    end_time: Optional[str] = Field(None, description="New end time (HH:MM)")
+    end_date: Optional[date_type] = Field(None, description="New end date for multi-day bookings")
+    status_id: Optional[int] = Field(None, description="New status ID", gt=0)
+    device_id: Optional[int] = Field(None, description="Device ID (null to unassign)")
+
+
+class LaravelSuccessResponse(BaseModel):
+    """Laravel-compatible success response."""
+    success: bool = True
+    data: dict
+    message: str
+    code: int = 200

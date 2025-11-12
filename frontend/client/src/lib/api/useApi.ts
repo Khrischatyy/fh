@@ -9,7 +9,7 @@ interface FetchOptions {
 }
 
 interface RequestOptions {
-  method: "GET" | "POST" | "PUT" | "DELETE"
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
   params?: Record<string, any>
   body?: any
 }
@@ -87,6 +87,8 @@ export function useApi<ResponseT, MappedResponseT = ResponseT>({
       makeRequest({ ...requestOptions, method: "POST", body: data }),
     put: (data: any, requestOptions?: RequestOptions) =>
       makeRequest({ ...requestOptions, method: "PUT", body: data }),
+    patch: (data: any, requestOptions?: RequestOptions) =>
+      makeRequest({ ...requestOptions, method: "PATCH", body: data }),
     delete: (requestOptions?: RequestOptions) =>
       makeRequest({ ...requestOptions, method: "DELETE" }),
   }

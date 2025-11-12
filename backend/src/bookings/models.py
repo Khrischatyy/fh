@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from src.auth.models import User
     from src.addresses.models import Address
     from src.payments.models import Charge
+    from src.devices.models import Device
 
 
 class BookingStatus(Base, IDMixin, TimestampMixin):
@@ -60,6 +61,12 @@ class Booking(Base, IDMixin, TimestampMixin):
         index=True,
         default=1,
     )
+    device_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("devices.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Booking time details
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
@@ -91,6 +98,10 @@ class Booking(Base, IDMixin, TimestampMixin):
         "Charge",
         back_populates="booking",
         cascade="all, delete-orphan",
+    )
+    device: Mapped[Optional["Device"]] = relationship(
+        "Device",
+        back_populates="bookings",
     )
 
     def __repr__(self) -> str:

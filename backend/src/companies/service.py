@@ -115,6 +115,10 @@ class CompanyService:
         """Check if user is admin of company."""
         return await self._repository.is_admin(company_id, user_id)
 
+    async def get_company_admin_id(self, company_id: int) -> int | None:
+        """Get the admin user ID for a company."""
+        return await self._repository.get_company_admin_id(company_id)
+
     def _generate_slug(self, name: str) -> str:
         """Generate URL-safe slug from company name."""
         slug = name.lower().strip()

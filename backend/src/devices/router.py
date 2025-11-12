@@ -19,6 +19,8 @@ from src.devices.schemas import (
     DeviceHeartbeatRequest,
     DeviceUnlockRequest,
 )
+from src.auth.schemas import DeviceRegisterWithTokenRequest
+from src.auth.service import auth_service
 from src.exceptions import BadRequestException
 
 router = APIRouter(prefix="/devices", tags=["devices"])
@@ -38,6 +40,59 @@ def get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+@router.post("/register-with-token", response_model=DeviceRegisterResponse, status_code=status.HTTP_201_CREATED)
+async def register_device_with_token(
+    device_data: DeviceRegisterWithTokenRequest,
+    request: Request,
+    service: DeviceService = Depends(get_device_service),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Register a device using a registration token from web app.
+
+    This is the NEW simplified flow:
+    1. User logs into web app
+    2. Web app shows a registration token
+    3. User copies token and pastes it into locker app
+    4. Locker app calls this endpoint with the token
+
+    No email/password needed in the locker app!
+    """
+    # Validate the registration token
+    registration_token = await auth_service.validate_device_registration_token(
+        db,
+        device_data.registration_token
+    )
+
+    # Register the device
+    ip_address = get_client_ip(request)
+
+    # Create device data for registration
+    device_request = DeviceRegisterRequest(
+        name=device_data.device_name or "Mac Device",
+        mac_address=device_data.mac_address or "unknown",
+        device_uuid=device_data.device_uuid,
+        os_version=device_data.os_version,
+        app_version=device_data.app_version,
+        unlock_password=device_data.unlock_password
+    )
+
+    device, device_token = await service.register_device(
+        registration_token.user_id,
+        device_request,
+        ip_address
+    )
+
+    # Mark token as used
+    await auth_service.mark_token_as_used(db, registration_token, device_data.device_name)
+
+    return DeviceRegisterResponse(
+        device_token=device_token,
+        device_uuid=device.device_uuid,
+        message="Device registered successfully. Save this token securely!",
+    )
+
+
 @router.post("/register-from-app", response_model=DeviceRegisterResponse, status_code=status.HTTP_201_CREATED)
 async def register_device_from_app(
     device_data: DeviceRegisterRequest,
@@ -46,10 +101,10 @@ async def register_device_from_app(
     service: DeviceService = Depends(get_device_service),
 ):
     """
-    Auto-register a device when user signs in via Mac OS app.
+    LEGACY: Auto-register a device when user signs in via Mac OS app with email/password.
 
-    This endpoint is called by the Mac OS app during first-time authentication.
-    The app collects device info automatically and registers it.
+    This is the old flow that requires email/password in the locker app.
+    Consider using /register-with-token instead for better security.
     """
     ip_address = get_client_ip(request)
     device, device_token = await service.register_device(current_user.id, device_data, ip_address)

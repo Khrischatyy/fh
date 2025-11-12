@@ -3,7 +3,7 @@ Booking router - API endpoints for room reservations.
 """
 from typing import Annotated
 from datetime import date as date_type, time as time_type
-from fastapi import APIRouter, Depends, Query, Body, status
+from fastapi import APIRouter, Depends, Query, Body, Path, status
 
 from src.bookings.dependencies import get_booking_service
 from src.bookings.service import BookingService
@@ -378,3 +378,106 @@ async def filter_booking_history(
             "message": str(e),
             "code": 500
         }
+
+
+@router.get(
+    "/bookings/{booking_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Get booking details",
+    description="Get detailed booking information with all relationships"
+)
+async def get_booking_detail(
+    booking_id: Annotated[int, Path(description="Booking ID", gt=0)],
+    service: Annotated[BookingService, Depends(get_booking_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Get booking detail with device, room, status, and user information.
+
+    **Authorization:**
+    - User who made the booking
+    - OR studio owner of the booking's studio
+
+    **Returns:**
+    - Complete booking details with all relationships
+    """
+    result = await service.get_booking_detail(booking_id, current_user.id)
+
+    return {
+        "success": True,
+        "data": result,
+        "message": "Booking retrieved successfully",
+        "code": 200
+    }
+
+
+@router.patch(
+    "/bookings/{booking_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Update booking",
+    description="Update booking fields (studio owner only)"
+)
+async def update_booking(
+    booking_id: Annotated[int, Path(description="Booking ID", gt=0)],
+    request: Annotated[dict, Body(...)],
+    service: Annotated[BookingService, Depends(get_booking_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Update booking fields.
+
+    **Authorization:**
+    - Only studio owner can update bookings
+
+    **Request Body:**
+    - date: New booking date (YYYY-MM-DD)
+    - start_time: New start time (HH:MM)
+    - end_time: New end time (HH:MM)
+    - end_date: New end date (YYYY-MM-DD)
+    - status_id: New status ID
+    - device_id: Device ID (or null to unassign)
+
+    **Returns:**
+    - Updated booking details
+    """
+    # Filter out None values
+    update_data = {k: v for k, v in request.items() if v is not None}
+
+    result = await service.update_booking(booking_id, current_user.id, update_data)
+
+    return {
+        "success": True,
+        "data": result,
+        "message": "Booking updated successfully",
+        "code": 200
+    }
+
+
+@router.get(
+    "/bookings/{booking_id}/available-devices",
+    status_code=status.HTTP_200_OK,
+    summary="Get available devices for booking",
+    description="Get studio owner's available devices for assignment to booking"
+)
+async def get_available_devices(
+    booking_id: Annotated[int, Path(description="Booking ID", gt=0)],
+    service: Annotated[BookingService, Depends(get_booking_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Get available devices for a booking.
+
+    **Authorization:**
+    - Only studio owner can view available devices
+
+    **Returns:**
+    - List of active, non-blocked devices owned by the studio owner
+    """
+    devices = await service.get_available_devices(booking_id, current_user.id)
+
+    return {
+        "success": True,
+        "data": devices,
+        "message": "Available devices retrieved successfully",
+        "code": 200
+    }

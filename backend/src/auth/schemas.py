@@ -165,3 +165,23 @@ class ProfileInformationUpdate(BaseModel):
     username: Optional[str] = Field(None, max_length=100)
     phone: Optional[str] = Field(None, max_length=50)
     date_of_birth: Optional[datetime] = None
+
+
+class DeviceRegistrationTokenResponse(BaseModel):
+    """Schema for device registration token response."""
+    success: bool = True
+    token: str
+    expires_at: datetime
+    message: str = "Device registration token generated"
+    code: int = 200
+
+
+class DeviceRegisterWithTokenRequest(BaseModel):
+    """Schema for registering device with token."""
+    registration_token: str = Field(..., description="Device registration token from web app")
+    device_name: Optional[str] = Field(None, max_length=255, description="Device name")
+    mac_address: Optional[str] = Field(None, max_length=255, description="MAC address")
+    device_uuid: str = Field(..., description="Device UUID")
+    os_version: Optional[str] = Field(None, max_length=100, description="OS version")
+    app_version: Optional[str] = Field(None, max_length=50, description="App version")
+    unlock_password: Optional[str] = Field(None, min_length=6, description="Optional unlock password")

@@ -27,6 +27,7 @@
           </div>
           <BookingCard
             class="border border-white border-opacity-30"
+            @manage-booking="openBookingModal"
             @on-favorite-change="getBookings()"
             @onCancelBooking="handleCancelBooking"
             v-for="booking in bookings"
@@ -59,6 +60,14 @@
           </button>
         </div>
       </div>
+      <ManageBookingModal
+        v-if="showManageModal && selectedBooking"
+        :showPopup="showManageModal"
+        :booking="selectedBooking"
+        @closePopup="closeManageModal"
+        @updated="handleBookingUpdated"
+        @on-cancel-booking="handleCancelBooking"
+      />
     </NuxtLayout>
   </div>
 </template>
@@ -67,14 +76,15 @@
 
 <script setup lang="ts">
 import { FilterBar } from "~/src/shared/ui/components"
-import { AddStudioButton } from "~/src/features/addStudio"
 import { computed, onMounted, reactive, ref } from "vue"
 import { BookingCard } from "~/src/entities/Booking/ui"
 import { useApi } from "~/src/lib/api"
 import { Spinner } from "~/src/shared/ui/common"
 import { filterUnassigned } from "~/src/shared/utils"
+import { ManageBookingModal } from "~/src/widgets/Modals"
 
-const showPopup = ref(false)
+const showManageModal = ref(false)
+const selectedBooking = ref(null)
 const filterShow = reactive([
   { key: "search", options: "", value: "" },
   {
@@ -86,13 +96,6 @@ const filterShow = reactive([
   { key: "time", options: "", value: "" },
 ])
 
-type BookingRecent = {
-  id: number
-  name: string
-  address: string
-  date: string
-}
-
 type Booking = {
   id: number
   name: string
@@ -103,14 +106,6 @@ type Booking = {
   time: string
   date: string
 }
-
-const recentStudio = ref<BookingRecent>({
-  id: 1,
-  name: "Studio 1",
-  isFavorite: true,
-  address: "123 Main St",
-  date: "04/07/2024",
-})
 
 const handleFiltersChange = (newFilters) => {
   filterShow.forEach((filter) => {
@@ -134,8 +129,8 @@ const availableStatuses = computed(() => {
   })
 })
 
-const handleCancelBooking = (bookings) => {
-  bookings.value = bookings
+const handleCancelBooking = () => {
+  closeManageModal()
   getBookings()
 }
 const getBookings = async (page = 1) => {
@@ -186,13 +181,25 @@ const getBookings = async (page = 1) => {
       console.error("Error fetching bookings:", error)
     })
 }
-const togglePopup = () => {
-  showPopup.value = !showPopup.value
-}
 
 const goToPage = (page: number) => {
   if (page >= 1 && page <= lastPage.value) {
     getBookings(page)
   }
+}
+
+const openBookingModal = (booking) => {
+  selectedBooking.value = booking
+  showManageModal.value = true
+}
+
+const closeManageModal = () => {
+  showManageModal.value = false
+  selectedBooking.value = null
+}
+
+const handleBookingUpdated = () => {
+  closeManageModal()
+  getBookings()
 }
 </script>

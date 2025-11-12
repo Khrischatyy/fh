@@ -43,6 +43,7 @@ class Device(Base, IDMixin, TimestampMixin):
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="devices")
+    bookings: Mapped[list["Booking"]] = relationship("Booking", back_populates="device")
 
 
 class DeviceLog(Base, IDMixin, TimestampMixin):

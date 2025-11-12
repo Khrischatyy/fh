@@ -49,40 +49,18 @@
       </div>
     </div>
 
-    <!-- Actions -->
-    <div class="flex gap-2">
-      <button
-        v-if="device.is_blocked"
-        @click="$emit('onUnblock', device.id)"
-        class="flex-1 h-10 hover:opacity-90 bg-green-600 rounded-[10px] text-white text-sm font-medium tracking-wide"
-      >
-        Unblock Device
-      </button>
-      <button
-        v-else
-        @click="$emit('onBlock', device.id)"
-        class="flex-1 h-10 hover:opacity-90 bg-red-600 rounded-[10px] text-white text-sm font-medium tracking-wide"
-      >
-        Block Device
-      </button>
-      <button
-        @click="$emit('onEdit', device)"
-        class="h-10 px-4 hover:opacity-90 bg-white bg-opacity-10 rounded-[10px] text-white text-sm font-medium"
-      >
-        Edit
-      </button>
-      <button
-        @click="$emit('onDelete', device.id)"
-        class="h-10 px-4 hover:opacity-90 bg-red-600 bg-opacity-20 rounded-[10px] text-red-500 text-sm font-medium"
-      >
-        <IconTrash class="w-4 h-4" />
-      </button>
-    </div>
+    <!-- Manage Button -->
+    <button
+      @click.stop="manageDevicePopup"
+      class="w-full h-11 hover:opacity-90 bg-white rounded-[10px] text-neutral-900 text-sm font-medium tracking-wide"
+    >
+      Manage Device
+    </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { IconMonitor, IconClock, IconTrash } from "~/src/shared/ui/common"
+import { IconMonitor, IconClock } from "~/src/shared/ui/common"
 import IconAddress from "~/src/shared/ui/common/Icon/IconAddress.vue"
 
 interface Device {
@@ -104,12 +82,13 @@ const props = defineProps<{
   device: Device
 }>()
 
-defineEmits<{
-  (e: "onBlock", deviceId: number): void
-  (e: "onUnblock", deviceId: number): void
-  (e: "onDelete", deviceId: number): void
-  (e: "onEdit", device: Device): void
+const emit = defineEmits<{
+  (e: "manageDevice", device: Device): void
 }>()
+
+const manageDevicePopup = () => {
+  emit("manageDevice", props.device)
+}
 
 const getStatusText = () => {
   if (props.device.is_blocked) {

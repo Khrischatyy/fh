@@ -226,12 +226,14 @@ class BookingManagementService:
         admin_company = result.scalar_one_or_none()
 
         # Build base query
-        # User sees their own bookings OR bookings at their studios
-        conditions = [Booking.user_id == user_id]
-
+        # Studio owners see ONLY bookings at their studios
+        # Regular users see their own bookings
         if admin_company:
-            # Also include bookings at this user's studios
-            conditions.append(Address.company_id == admin_company.company_id)
+            # Studio owner: Show only bookings at their studios
+            conditions = [Address.company_id == admin_company.company_id]
+        else:
+            # Regular user: Show their own bookings
+            conditions = [Booking.user_id == user_id]
 
         stmt = (
             select(Booking)
@@ -314,7 +316,8 @@ class BookingManagementService:
             selectinload(Booking.room).selectinload(Room.address).selectinload(Address.company),
             selectinload(Booking.room).selectinload(Room.address).selectinload(Address.badges),
             selectinload(Booking.status),
-            selectinload(Booking.user)
+            selectinload(Booking.user),
+            selectinload(Booking.device)
         )
 
         # Execute query
@@ -332,6 +335,7 @@ class BookingManagementService:
                 "room_id": booking.room_id,
                 "user_id": booking.user_id,
                 "status_id": booking.status_id,
+                "device_id": booking.device_id,
                 "room": {
                     "id": booking.room.id,
                     "name": booking.room.name,
@@ -353,6 +357,12 @@ class BookingManagementService:
                     "id": booking.status.id,
                     "name": booking.status.name
                 },
+                "device": {
+                    "id": booking.device.id,
+                    "name": booking.device.name,
+                    "is_active": booking.device.is_active,
+                    "is_blocked": booking.device.is_blocked
+                } if booking.device else None,
                 "created_at": booking.created_at.isoformat(),
                 "updated_at": booking.updated_at.isoformat(),
             }

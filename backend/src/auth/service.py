@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 import secrets
 
-from src.auth.models import User, UserRole, PasswordResetToken
+from src.auth.models import User, UserRole, PasswordResetToken, DeviceRegistrationToken
 from src.auth.schemas import UserRegister, UserUpdate, ProfileInformationUpdate
 from src.config import settings
 from src.exceptions import UnauthorizedException, NotFoundException, ConflictException, BadRequestException
@@ -382,6 +382,96 @@ class AuthService:
         if not user.password_hash:
             return False
         return self.verify_password(password, user.password_hash)
+
+    async def generate_device_registration_token(
+        self,
+        db: AsyncSession,
+        user_id: int,
+        expires_hours: int = 24
+    ) -> DeviceRegistrationToken:
+        """
+        Generate a device registration token for locker app.
+
+        Args:
+            db: Database session
+            user_id: User ID
+            expires_hours: Token expiration in hours (default: 24)
+
+        Returns:
+            DeviceRegistrationToken model instance
+        """
+        # Generate secure random token (32 bytes = 64 hex chars)
+        token = secrets.token_hex(32)
+
+        # Set expiration
+        expires_at = datetime.utcnow() + timedelta(hours=expires_hours)
+
+        # Create token record
+        registration_token = DeviceRegistrationToken(
+            user_id=user_id,
+            token=token,
+            expires_at=expires_at,
+            is_used=False
+        )
+
+        db.add(registration_token)
+        await db.commit()
+        await db.refresh(registration_token)
+
+        return registration_token
+
+    async def validate_device_registration_token(
+        self,
+        db: AsyncSession,
+        token: str
+    ) -> DeviceRegistrationToken:
+        """
+        Validate a device registration token.
+
+        Args:
+            db: Database session
+            token: Registration token string
+
+        Returns:
+            DeviceRegistrationToken if valid
+
+        Raises:
+            UnauthorizedException: If token is invalid, expired, or already used
+        """
+        result = await db.execute(
+            select(DeviceRegistrationToken)
+            .filter(DeviceRegistrationToken.token == token)
+            .filter(DeviceRegistrationToken.is_used == False)
+        )
+        registration_token = result.scalar_one_or_none()
+
+        if not registration_token:
+            raise UnauthorizedException("Invalid or already used device registration token")
+
+        # Check expiration
+        if datetime.utcnow() > registration_token.expires_at:
+            raise UnauthorizedException("Device registration token expired")
+
+        return registration_token
+
+    async def mark_token_as_used(
+        self,
+        db: AsyncSession,
+        token: DeviceRegistrationToken,
+        device_name: Optional[str] = None
+    ) -> None:
+        """
+        Mark a registration token as used.
+
+        Args:
+            db: Database session
+            token: DeviceRegistrationToken instance
+            device_name: Optional device name to store
+        """
+        token.is_used = True
+        if device_name:
+            token.device_name = device_name
+        await db.commit()
 
 
 # Service instance
