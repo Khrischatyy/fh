@@ -13,6 +13,40 @@ Funny-how is a studio booking platform with two backend implementations (Laravel
 - `frontend/client/` - Nuxt 3 client application
 - `frontend/chat/` - Socket.io chat service (Express.js)
 - `caddy/` - Caddy reverse proxy configuration
+- `locker/` - macOS device locker application (see `locker/CLAUDE.md` for details)
+
+## FunnyHow Locker - macOS Device Management App
+
+**Full Documentation**: See `/locker/CLAUDE.md` for complete details.
+
+**Quick Start:**
+```bash
+cd /Users/alexkhrishchatyi/www/funny-how/locker
+
+# First time setup
+make setup          # Setup virtual environment and install dependencies
+
+# Build the app
+make build          # Build the .app bundle
+
+# Launch
+make test-app       # Test the built app
+```
+
+**Common Commands:**
+```bash
+make run            # Run from source (development)
+make rebuild        # Clean and rebuild
+make dmg            # Create DMG installer
+make help           # Show all available commands
+```
+
+**Key Features:**
+- ✅ Token-based device registration (no email/password)
+- ✅ Automatic screen locking when outside booking times
+- ✅ Menu bar app with custom FunnyHow branding
+- ✅ Dock icon with custom logo
+- ✅ Multi-method screen locking (pmset, CGSession, AppleScript)
 
 ## Development Commands
 
