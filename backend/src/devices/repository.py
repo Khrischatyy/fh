@@ -118,3 +118,24 @@ class DeviceRepository:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def has_active_booking(self, device_id: int, current_date, current_time) -> bool:
+        """Check if device has an active booking at the given date/time."""
+        from src.bookings.models import Booking
+        from sqlalchemy import and_
+
+        stmt = (
+            select(Booking)
+            .where(
+                and_(
+                    Booking.device_id == device_id,
+                    Booking.status_id == 2,  # Confirmed status
+                    Booking.date == current_date,
+                    Booking.start_time <= current_time,
+                    Booking.end_time >= current_time
+                )
+            )
+        )
+        result = await self.db.execute(stmt)
+        active_booking = result.scalar_one_or_none()
+        return active_booking is not None

@@ -220,18 +220,41 @@ class DeviceService:
             "ip_address": ip_address,
         })
 
-        # Return status
+        # Check if manually blocked by admin
         if device.is_blocked:
             return DeviceStatusResponse(
                 is_blocked=True,
                 should_lock=True,
                 message="Device is blocked by studio owner"
             )
-        else:
+
+        # Check for active bookings
+        from datetime import datetime
+
+        now = datetime.utcnow()
+        current_date = now.date()
+        current_time = now.time()
+
+        # Check if device has an active booking right now
+        has_active_booking = await self.repository.has_active_booking(
+            device.id,
+            current_date,
+            current_time
+        )
+
+        if has_active_booking:
+            # Inside active booking time - don't lock
             return DeviceStatusResponse(
                 is_blocked=False,
                 should_lock=False,
-                message="Device is active"
+                message="Device is active - inside booking time"
+            )
+        else:
+            # Outside booking time - should lock
+            return DeviceStatusResponse(
+                is_blocked=False,
+                should_lock=True,
+                message="No active booking - device should be locked"
             )
 
     async def unlock_device_with_password(self, device_uuid: str, password: str) -> bool:
