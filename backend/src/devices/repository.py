@@ -139,3 +139,15 @@ class DeviceRepository:
         result = await self.db.execute(stmt)
         active_booking = result.scalar_one_or_none()
         return active_booking is not None
+
+    async def has_any_bookings(self, device_id: int) -> bool:
+        """Check if device has any bookings assigned (past, present, or future)."""
+        from src.bookings.models import Booking
+
+        stmt = (
+            select(Booking)
+            .where(Booking.device_id == device_id)
+            .limit(1)
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none() is not None

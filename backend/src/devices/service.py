@@ -249,8 +249,19 @@ class DeviceService:
                 should_lock=False,
                 message="Device is active - inside booking time"
             )
+
+        # Check if device has any bookings assigned at all
+        has_any_bookings = await self.repository.has_any_bookings(device.id)
+
+        if not has_any_bookings:
+            # Device has no bookings assigned - don't lock (free device)
+            return DeviceStatusResponse(
+                is_blocked=False,
+                should_lock=False,
+                message="Device is active - no bookings assigned"
+            )
         else:
-            # Outside booking time - should lock
+            # Device has bookings but outside booking time - should lock
             return DeviceStatusResponse(
                 is_blocked=False,
                 should_lock=True,

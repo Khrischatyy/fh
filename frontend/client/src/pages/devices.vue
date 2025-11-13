@@ -14,9 +14,6 @@
               <!-- Left Side - Info -->
               <div class="flex-1 min-w-[280px]">
                 <div class="flex items-center gap-3 mb-3">
-                  <div class="w-10 h-10 bg-white bg-opacity-10 rounded-lg flex items-center justify-center">
-                    <span class="text-2xl">🔐</span>
-                  </div>
                   <h3 class="text-xl font-bold text-white">Register Device</h3>
                 </div>
                 <p class="text-neutral-400 text-sm mb-4 leading-relaxed">
@@ -36,7 +33,6 @@
                   :disabled="isGeneratingToken"
                   class="px-6 py-3 bg-white text-black rounded-lg hover:opacity-90 disabled:opacity-50 font-medium transition-all shadow-lg hover:shadow-xl disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  <span v-if="!isGeneratingToken">🎟️</span>
                   <span>{{ isGeneratingToken ? 'Generating...' : 'Generate Token' }}</span>
                 </button>
                 <a
@@ -44,7 +40,6 @@
                   class="px-6 py-3 bg-neutral-800 text-white rounded-lg hover:bg-neutral-700 transition-all font-medium flex items-center justify-center gap-2 border border-neutral-700"
                   target="_blank"
                 >
-                  <span>📦</span>
                   <span>Download App</span>
                 </a>
               </div>
@@ -98,62 +93,55 @@
         class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
         @click.self="showTokenModal = false"
       >
-        <div class="bg-neutral-900 rounded-lg p-8 max-w-2xl w-full border border-neutral-800">
-          <div class="flex justify-between items-start mb-6">
-            <div>
-              <h2 class="text-2xl font-bold text-white mb-2">✅ Token Generated!</h2>
-              <p class="text-neutral-400 text-sm">
-                Copy this token and paste it in your Mac OS app
-              </p>
-            </div>
+        <div class="bg-neutral-900 rounded-lg p-6 max-w-lg w-full border border-neutral-800">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-white">Token Generated</h2>
             <button
               @click="showTokenModal = false"
               class="text-neutral-400 hover:text-white transition-colors"
             >
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
 
-          <div class="bg-neutral-950 border border-neutral-700 rounded-lg p-4 mb-4">
+          <p class="text-neutral-400 text-sm mb-4">
+            Copy this token and paste it in your Mac OS app
+          </p>
+
+          <div class="bg-neutral-800 bg-opacity-40 border border-neutral-600 rounded-lg p-3 mb-3">
+            <p class="text-neutral-300 text-xs font-medium mb-2">Important:</p>
+            <ul class="text-neutral-400 text-xs space-y-1">
+              <li>• Expires in 24 hours</li>
+              <li>• Single-use only</li>
+              <li>• Keep secure</li>
+            </ul>
+          </div>
+
+          <div class="bg-neutral-950 border border-neutral-700 rounded-lg p-3 mb-4">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-neutral-400 text-xs font-mono">DEVICE REGISTRATION TOKEN</span>
+              <span class="text-neutral-400 text-xs font-mono">TOKEN</span>
               <button
                 @click="copyToken"
-                class="px-3 py-1 bg-white text-black text-xs rounded hover:opacity-90 transition-opacity"
+                class="px-3 py-1 bg-white text-black text-xs rounded hover:opacity-90 transition-opacity font-medium"
               >
-                {{ tokenCopied ? '✓ Copied!' : '📋 Copy' }}
+                {{ tokenCopied ? 'Copied!' : 'Copy' }}
               </button>
             </div>
-            <code class="text-white font-mono text-sm break-all block">{{ generatedToken }}</code>
+            <code class="text-white font-mono text-xs break-all block">{{ generatedToken }}</code>
           </div>
 
-          <div class="bg-yellow-900 bg-opacity-20 border border-yellow-700 rounded-lg p-4 mb-6">
-            <div class="flex items-start space-x-3">
-              <span class="text-yellow-500 text-xl">⚠️</span>
-              <div>
-                <p class="text-yellow-200 text-sm font-medium mb-1">Important:</p>
-                <ul class="text-yellow-200 text-xs space-y-1">
-                  <li>• Token expires in <strong>24 hours</strong></li>
-                  <li>• Can only be used <strong>once</strong></li>
-                  <li>• Keep it secure - don't share it</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <div class="space-y-3 mb-6">
+          <div class="space-y-2">
             <p class="text-white font-medium text-sm">How to use:</p>
-            <ol class="text-neutral-300 text-sm space-y-2 ml-4">
-              <li>1. Open <strong>FunnyHow Device Locker</strong> on your Mac</li>
-              <li>2. Click the menu bar icon and select <strong>"Register with Token..."</strong></li>
+            <ol class="text-neutral-300 text-xs space-y-1 ml-4">
+              <li>1. Open FunnyHow Device Locker on your Mac</li>
+              <li>2. Click menu bar icon and select "Register with Token..."</li>
               <li>3. Paste this token when prompted</li>
-              <li>4. Your device will be registered automatically! 🎉</li>
             </ol>
           </div>
 
-          <p class="text-neutral-500 text-xs text-center">
+          <p class="text-neutral-500 text-xs text-center mt-4">
             Expires: {{ tokenExpiresAt }}
           </p>
         </div>

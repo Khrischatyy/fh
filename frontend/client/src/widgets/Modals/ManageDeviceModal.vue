@@ -37,8 +37,6 @@ const isSaving = ref(false)
 
 const formData = ref({
   name: '',
-  notes: '',
-  is_active: true,
 })
 
 const emit = defineEmits<{
@@ -65,8 +63,6 @@ const handleSave = async () => {
 
     const dataToSend = {
       name: formData.value.name,
-      notes: formData.value.notes || null,
-      is_active: formData.value.is_active,
     }
 
     const response = await updateDevice(dataToSend)
@@ -145,8 +141,6 @@ watch(() => props.device, (newDevice) => {
   if (newDevice && props.showPopup) {
     formData.value = {
       name: newDevice.name || '',
-      notes: newDevice.notes || '',
-      is_active: newDevice.is_active,
     }
   }
 }, { immediate: true })
@@ -161,17 +155,17 @@ watch(() => props.device, (newDevice) => {
     @close="closePopup"
   >
     <template #header>
-      <div class="flex justify-start items-center gap-5">
+      <div class="flex justify-start items-center gap-4">
         <div class="h-[35px] w-[35px] flex items-center justify-center bg-white bg-opacity-10 rounded">
           <IconMonitor class="w-6 h-6" />
         </div>
         <div>
-          <h3 class="text-xl font-bold text-white">
+          <h3 class="text-xl font-bold text-white mb-1">
             {{ device?.name }}
           </h3>
           <p
             :class="getStatusColor()"
-            class="font-['Montserrat']"
+            class="font-['Montserrat'] text-sm"
           >
             {{ getStatusText() }}
           </p>
@@ -179,39 +173,39 @@ watch(() => props.device, (newDevice) => {
       </div>
     </template>
     <template #body>
-      <div class="flex flex-col gap-7 justify-between items-center relative">
+      <div class="flex flex-col gap-6 justify-between items-center relative">
         <Spinner :is-loading="isLoading" />
 
         <!-- Device Info (Read-only) -->
         <div class="w-full bg-neutral-900 p-4 rounded-lg">
-          <div class="flex flex-col gap-3 text-sm">
+          <div class="flex flex-col gap-4 text-sm">
             <div class="flex items-center gap-2">
               <IconAddress class="opacity-20" />
-              <div class="flex flex-col">
+              <div class="flex flex-col gap-0.5">
                 <span class="text-white opacity-20 text-xs">MAC Address</span>
-                <span class="text-white font-mono">{{ device.mac_address }}</span>
+                <span class="text-white text-sm font-mono">{{ device.mac_address }}</span>
               </div>
             </div>
 
             <div class="flex items-center gap-2">
               <IconClock class="opacity-20" />
-              <div class="flex flex-col">
+              <div class="flex flex-col gap-0.5">
                 <span class="text-white opacity-20 text-xs">Last Seen</span>
-                <span class="text-white">{{ formatLastSeen() }}</span>
+                <span class="text-white text-sm">{{ formatLastSeen() }}</span>
               </div>
             </div>
 
             <div v-if="device.os_version" class="flex items-center gap-2">
               <IconMonitor class="opacity-20" />
-              <div class="flex flex-col">
+              <div class="flex flex-col gap-0.5">
                 <span class="text-white opacity-20 text-xs">OS Version</span>
-                <span class="text-white">{{ device.os_version }}</span>
+                <span class="text-white text-sm">{{ device.os_version }}</span>
               </div>
             </div>
 
             <div class="flex items-center gap-2">
               <IconMonitor class="opacity-20" />
-              <div class="flex flex-col">
+              <div class="flex flex-col gap-0.5">
                 <span class="text-white opacity-20 text-xs">Device UUID</span>
                 <span class="text-white font-mono text-xs break-all">{{ device.device_uuid }}</span>
               </div>
@@ -231,29 +225,6 @@ watch(() => props.device, (newDevice) => {
               placeholder="Enter device name"
             />
           </div>
-
-          <!-- Notes -->
-          <div>
-            <label class="text-white opacity-20 text-sm font-normal tracking-wide">Notes</label>
-            <textarea
-              v-model="formData.notes"
-              placeholder="Add notes about this device..."
-              class="w-full bg-neutral-900 text-white px-4 py-3 rounded-lg min-h-[100px] resize-none focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-20"
-            />
-          </div>
-
-          <!-- Active Status -->
-          <div class="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="is_active"
-              v-model="formData.is_active"
-              class="w-5 h-5 rounded"
-            />
-            <label for="is_active" class="text-sm text-white">
-              Device is active
-            </label>
-          </div>
         </div>
       </div>
     </template>
@@ -262,7 +233,7 @@ watch(() => props.device, (newDevice) => {
         <div class="flex justify-between items-center gap-3 w-full">
           <button
             @click="handleBlockUnblock"
-            :class="device.is_blocked ? 'bg-green-600 border-green-600' : 'bg-transparent border-red'"
+            :class="device.is_blocked ? 'bg-green-700 hover:bg-green-800 border-green-700' : 'bg-transparent border-red'"
             class="flex-1 h-11 p-3.5 hover:opacity-90 rounded-[10px] text-white border text-sm font-medium tracking-wide"
           >
             {{ device.is_blocked ? 'Unblock Device' : 'Block Device' }}
