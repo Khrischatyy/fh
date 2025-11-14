@@ -39,14 +39,16 @@ const processPayment = async () => {
     booking_id: bookingId.value,
   })
     .then((response) => {
-      if (response.code == 200) {
-        navigateTo("/bookings")
+      if (response.success) {
+        // Payment successful, redirect to bookings
+        navigateTo(response.redirect_url || "/bookings")
       } else {
-        errorMessage.value = response.message
+        // Payment failed or error occurred
+        errorMessage.value = response.message || "Payment verification failed."
       }
     })
     .catch((error) => {
-      errorMessage.value = error.message.error || "Payment verification failed."
+      errorMessage.value = error.message?.error || error.message || "Payment verification failed."
     })
     .finally(() => {
       isLoading.value = false

@@ -147,6 +147,11 @@ const getFirstPhoto = computed(() => {
   return props.booking.room.photos[0].path
 })
 
+// Check if current user is the studio owner
+const isStudioOwner = computed(() => {
+  return props.booking?.is_studio_owner === true
+})
+
 // Watch for booking changes and populate form
 watch(() => props.booking, (newBooking) => {
   if (newBooking && props.showPopup) {
@@ -276,8 +281,8 @@ watch(() => props.booking, (newBooking) => {
             />
           </div>
 
-          <!-- Status -->
-          <div>
+          <!-- Status - Only for studio owners -->
+          <div v-if="isStudioOwner">
             <FSelectClassic
               :wide="true"
               label="Status"
@@ -287,8 +292,8 @@ watch(() => props.booking, (newBooking) => {
             />
           </div>
 
-          <!-- Device -->
-          <div>
+          <!-- Device - Only for studio owners -->
+          <div v-if="isStudioOwner">
             <FSelectClassic
               :wide="true"
               label="Device"
@@ -308,7 +313,9 @@ watch(() => props.booking, (newBooking) => {
         >
           Cancel Booking
         </button>
+        <!-- Save button only for studio owners -->
         <button
+          v-if="isStudioOwner"
           @click="handleSave"
           :disabled="isSaving"
           class="w-full h-11 p-3.5 hover:opacity-90 bg-white rounded-[10px] text-black text-sm font-medium tracking-wide disabled:opacity-50"

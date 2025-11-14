@@ -686,6 +686,170 @@ const teammatesOptions = computed(() => {
 - Team member list shows both engineers and managers
 - Removing a team member detaches from address but does NOT delete the user account
 
+### Email System - SendGrid Integration
+
+The platform uses SendGrid for transactional email delivery with Celery for background processing.
+
+**Architecture:**
+- **SendGrid API**: Email delivery service
+- **Celery**: Async task processing via `src/tasks/email.py`
+- **Jinja2 Templates**: HTML email templates in `backend/templates/emails/`
+- **Email Assets**: Static assets (GIFs, logos) hosted at production server
+- **Tony Soprano Style**: All emails use direct, no-nonsense messaging
+
+**Email Templates Location:**
+```
+backend/templates/emails/
+├── welcome.html                      # Regular user welcome (polite Tony style)
+├── welcome_owner.html                # Studio owner welcome (setup instructions)
+├── stripe_verified.html              # Stripe account verified notification
+├── booking_confirmed.html            # Customer booking confirmation
+├── booking_confirmation_owner.html   # Studio owner booking notification
+├── reset_password.html               # Password reset
+└── verify_email.html                 # Email verification
+```
+
+**Email Assets:**
+```
+backend/static/email/gifs/
+└── tony.gif                          # Tony Soprano GIF used in all emails
+```
+
+**Configuration (`src/config.py`):**
+```python
+# SendGrid
+sendgrid_api_key: str
+mail_from_address: str = "noreply@funny-how.com"
+mail_from_name: str = "Funny How"
+
+# Email assets (must be uploaded to production server)
+frontend_url: str = "https://funny-how.com"
+unsubscribe_url: str = "https://funny-how.com/unsubscribe"
+email_assets_base_url: str = "https://funny-how.com/mail"
+```
+
+**Email Types:**
+
+1. **Welcome Email (Regular Users)** - `send_welcome_email()`
+   - Sent after email verification
+   - Polite Tony Soprano style
+   - Includes tony.gif
+   - Encourages booking studios
+
+2. **Welcome Email (Studio Owners)** - `send_welcome_email_owner()`
+   - Sent when user selects studio_owner role
+   - Simple welcome with setup instructions
+   - No password reset (handled separately)
+   - Links to dashboard
+
+3. **Stripe Verified Email** - `send_stripe_verified_email()`
+   - Sent when Stripe account is verified (`payouts_enabled = true`)
+   - Tony Soprano style: "You're ready, now wait for customers"
+   - Confirms studio is live and ready for bookings
+
+4. **Booking Confirmation (Customer)** - `send_booking_confirmation()`
+   - Sent after successful payment
+   - Includes studio details, date, time, address
+   - Tony style: "Show up on time"
+   - Link to view bookings
+
+5. **Booking Confirmation (Owner)** - `send_booking_confirmation_owner()`
+   - Sent to studio owner when booking is made
+   - Includes customer name, booking details, amount
+   - Tony style: "Make sure everything's ready"
+   - Link to view booking details
+
+**Celery Email Tasks (`src/tasks/email.py`):**
+
+```python
+from src.tasks.email import (
+    send_welcome_email,
+    send_welcome_email_owner,
+    send_stripe_verified_email,
+    send_booking_confirmation,
+    send_booking_confirmation_owner,
+    send_verification_email,
+    send_password_reset_email,
+)
+
+# Send email asynchronously
+send_welcome_email.delay(
+    email="user@example.com",
+    firstname="John",
+    lastname="Doe"
+)
+```
+
+**Email Flow:**
+
+**Regular Users:**
+1. Registration → `send_verification_email()`
+2. Email verified + role selected → `send_welcome_email()`
+3. Booking payment success → `send_booking_confirmation()`
+
+**Studio Owners:**
+1. Registration → `send_verification_email()`
+2. Role selected as studio_owner → `send_welcome_email_owner()`
+3. Stripe account verified → `send_stripe_verified_email()`
+4. Customer books studio → `send_booking_confirmation_owner()`
+
+**Booking Confirmation Email Integration:**
+
+In Stripe payment success flow (`src/payments/gateways/stripe_gateway.py`):
+```python
+# Format booking details
+booking_details = {
+    'studio_name': booking.room.address.company.name,
+    'room_name': booking.room.name,
+    'studio_address': booking.room.address.street,
+    'date': booking.date.strftime("%d %b %Y"),
+    'start_time': booking.start_time.strftime("%H:%M"),
+    'end_time': booking.end_time.strftime("%H:%M"),
+    'amount': float(total_amount_cents) / 100,
+    'customer_name': f"{booking.user.firstname} {booking.user.lastname}"
+}
+
+# Send customer confirmation
+send_booking_confirmation.delay(
+    email=booking.user.email,
+    firstname=booking.user.firstname,
+    booking_details=booking_details
+)
+
+# Send owner notification
+send_booking_confirmation_owner.delay(
+    email=studio_owner.email,
+    owner_name=studio_owner.firstname,
+    booking_details=booking_details
+)
+```
+
+**Email Asset Deployment:**
+
+**IMPORTANT**: Email assets must be uploaded to production server:
+- Upload `backend/static/email/gifs/tony.gif` to server
+- Production URL: `https://funny-how.com/mail/gifs/tony.gif`
+- Emails reference this URL via `email_assets_base_url` config
+
+**SendGrid Configuration:**
+- Click tracking disabled to prevent URL wrapping
+- Plain text fallback provided for all HTML emails
+- From address: Configured in `.env` via `MAIL_FROM_ADDRESS`
+
+**Template Variables:**
+
+All templates receive:
+- `firstname`, `lastname` - User name
+- `unsubscribe_url` - Unsubscribe link
+- `email_assets_base_url` - Base URL for GIFs/images (e.g., `https://funny-how.com/mail`)
+
+Booking emails also receive:
+- `studio_name`, `room_name`, `studio_address`
+- `booking_date`, `start_time`, `end_time`
+- `bookings_url` - Link to view bookings
+- `customer_name` (owner email only)
+- `amount` (owner email only)
+
 ### Laravel Backend (laravel/) - Legacy
 
 Standard Laravel 9 structure. Prefer using FastAPI backend for new features.

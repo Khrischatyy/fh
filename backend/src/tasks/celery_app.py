@@ -26,6 +26,17 @@ celery_app.conf.update(
     worker_max_tasks_per_child=1000,
 )
 
+# Celery Beat schedule for periodic tasks
+celery_app.conf.beat_schedule = {
+    'expire-unpaid-bookings-every-15-minutes': {
+        'task': 'expire_unpaid_bookings',
+        'schedule': 900.0,  # 15 minutes in seconds (15 * 60)
+        'options': {
+            'expires': 60,  # Task expires after 60 seconds if not executed
+        }
+    },
+}
+
 # Auto-discover tasks from all modules
 celery_app.autodiscover_tasks(
     [

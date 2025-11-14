@@ -168,13 +168,8 @@ class AuthService:
         await db.commit()
         await db.refresh(user)
 
-        # Send welcome email (queued via Celery, like Laravel)
-        from src.tasks.email import send_welcome_email
-        send_welcome_email.delay(
-            email=user.email,
-            firstname=user.firstname,
-            lastname=user.lastname
-        )
+        # Welcome email will be sent by the caller (router) based on role
+        # No need to send here to avoid duplicates
 
         return user
 

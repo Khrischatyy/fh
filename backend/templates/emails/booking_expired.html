@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Welcome to Funny How</title>
+    <title>Booking Payment Expired</title>
     <style>
         body {
             background-color: #f2f2f2;
@@ -20,22 +20,28 @@
             text-align: center;
         }
         .button {
-            font-size: 24px;
-            color: #ffffff !important;
-            text-transform: uppercase;
+            display: inline-block;
+            width: 100%;
+            height: 44px;
+            background-color: #ffffff;
+            color: #333333;
+            border-radius: 10px;
+            text-align: center;
+            line-height: 44px;
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 0.05em;
             text-decoration: none;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            opacity: 1;
             transition: opacity 0.3s;
         }
         .button:hover {
-            opacity: 0.7;
+            opacity: 0.9;
         }
-        .img-icon {
-            height: 34px;
-            margin-left: 10px;
+        .info-box {
+            background-color: #1a1a1a;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
         }
     </style>
 </head>
@@ -51,11 +57,25 @@
                     </tr>
                     <tr>
                         <td class="center" style="padding: 20px; font-size: 18px; color: #fff !important;">
-                            <h1 style="color: #ffffff !important; font-size: 24px; font-weight: 700; margin-bottom: 20px;">Welcome to Funny How</h1>
-                            <p>Hey {{ firstname }}, welcome aboard.</p>
-                            <p>You're all set. We got studios all over - just find the one you like and book it.</p>
-                            <p>Need help? We got your back. Any questions, just reach out.</p>
-                            <p>Now go find your spot and make something great.</p>
+                            <h1 style="color: #ffffff !important; font-size: 24px; font-weight: 700; margin-bottom: 20px;">Time's Up</h1>
+                            <p>{{ user_name }}, listen.</p>
+                            <p>Your booking expired. You didn't pay in time, so it's gone.</p>
+
+                            <div class="info-box">
+                                <p style="margin: 5px 0;"><strong>Booking ID:</strong> #{{ booking_id }}</p>
+                                <p style="margin: 5px 0;"><strong>Studio:</strong> {{ studio_name }}</p>
+                                <p style="margin: 5px 0;"><strong>Date:</strong> {{ date }}</p>
+                                <p style="margin: 5px 0;"><strong>Time:</strong> {{ start_time }} to {{ end_time }}</p>
+                            </div>
+
+                            <p><strong>What happened?</strong> You got 30 minutes to pay. You didn't. Booking's cancelled automatically.</p>
+                            <p>Still want this time slot? Book it again. Maybe pay faster this time.</p>
+
+                            <div style="padding: 10px; text-align: center; margin-top: 20px;">
+                                <p>
+                                    <a href="{{ browse_url }}" class="button">Browse Studios</a>
+                                </p>
+                            </div>
                         </td>
                     </tr>
                     <tr>

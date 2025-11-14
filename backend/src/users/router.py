@@ -525,6 +525,24 @@ async def set_role(
         service = UserService(db)
         role_name = await service.set_role(current_user, request.role)
 
+        # Send appropriate welcome email based on role
+        from src.tasks.email import send_welcome_email, send_welcome_email_owner
+
+        if role_name == "studio_owner":
+            # Studio owner welcome email (simple - full setup email comes after Stripe verification)
+            send_welcome_email_owner.delay(
+                email=current_user.email,
+                firstname=current_user.firstname,
+                lastname=current_user.lastname
+            )
+        else:
+            # Regular user welcome email
+            send_welcome_email.delay(
+                email=current_user.email,
+                firstname=current_user.firstname,
+                lastname=current_user.lastname
+            )
+
         return LaravelResponse(
             success=True,
             data=role_name,

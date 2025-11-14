@@ -219,3 +219,61 @@ class BookingRepository:
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_expired_pending_bookings(self) -> list[Booking]:
+        """
+        Get all pending bookings with expired payment links.
+
+        Returns bookings where:
+        - status_id = 1 (pending)
+        - temporary_payment_link_expires_at IS NOT NULL
+        - temporary_payment_link_expires_at < NOW()
+
+        Used by the periodic expiry task to find bookings that need to be marked as expired.
+
+        Note: Returns bookings without relationships to avoid circular dependencies.
+        Relationships must be loaded separately if needed.
+        """
+        from datetime import datetime
+
+        stmt = (
+            select(Booking)
+            .where(
+                and_(
+                    Booking.status_id == 1,  # pending
+                    Booking.temporary_payment_link_expires_at.isnot(None),
+                    Booking.temporary_payment_link_expires_at < datetime.now()
+                )
+            )
+            .order_by(Booking.temporary_payment_link_expires_at)
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def bulk_update_booking_status(
+        self,
+        booking_ids: list[int],
+        new_status_id: int
+    ) -> int:
+        """
+        Bulk update booking status for multiple bookings.
+
+        Args:
+            booking_ids: List of booking IDs to update
+            new_status_id: New status ID to set
+
+        Returns:
+            Number of bookings updated
+        """
+        if not booking_ids:
+            return 0
+
+        from sqlalchemy import update
+
+        stmt = (
+            update(Booking)
+            .where(Booking.id.in_(booking_ids))
+            .values(status_id=new_status_id)
+        )
+        result = await self._session.execute(stmt)
+        return result.rowcount

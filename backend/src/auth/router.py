@@ -398,6 +398,7 @@ async def google_callback(
         # Check if user with email exists
         user = await auth_service.get_user_by_email(db, email)
 
+        is_new_user = False
         if user:
             # Update existing user with Google ID and avatar
             user = await auth_service.update_google_user(
@@ -416,6 +417,7 @@ async def google_callback(
                 lastname=lastname,
                 avatar=avatar,
             )
+            is_new_user = True
 
         # Create access token (Sanctum-style format: {id}|{token})
         access_token_jwt = auth_service.create_access_token(
@@ -425,6 +427,9 @@ async def google_callback(
 
         # Format token like Laravel Sanctum: "{id}|{plainTextToken}"
         sanctum_token = f"{user.id}|{access_token_jwt}"
+
+        # Welcome email will be sent when user sets their role in /api/user/set-role
+        # Google OAuth users start with role=None and must choose their role first
 
         # Redirect to frontend with token (Laravel behavior)
         frontend_callback_url = f"{settings.frontend_url}/auth/callback?token={sanctum_token}"

@@ -255,7 +255,7 @@ async def get_photo_image(path: str):
             io.BytesIO(image_data),
             media_type=content_type,
             headers={
-                "Cache-Control": "public, max-age=31536000",  # Cache for 1 year
+                "Cache-Control": "public, max-age=86400",  # Cache for 1 day
                 "Content-Disposition": f'inline; filename="{path.split("/")[-1]}"'
             }
         )

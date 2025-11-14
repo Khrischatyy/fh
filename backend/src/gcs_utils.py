@@ -20,10 +20,6 @@ def get_public_url(blob_path: str, use_proxy: bool = True) -> str:
     Returns:
         URL to access the file
     """
-    # If it's already a full URL, return as-is
-    if blob_path.startswith("http://") or blob_path.startswith("https://"):
-        return blob_path
-
     if use_proxy:
         # Return proxied URL through backend
         # The frontend will call: http://127.0.0.1/api/badges/image/public/badges/mixing.svg

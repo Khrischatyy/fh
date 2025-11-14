@@ -47,16 +47,14 @@
         <IconCalendar class="opacity-20" />
         <div class="flex flex-col group-hover:opacity-100">
           <span class="text-white opacity-20">Date</span>
-          <span class="text-white">{{ booking.date }}</span>
+          <span class="text-white">{{ formattedDate }}</span>
         </div>
       </div>
       <div class="flex items-center gap-2 relative group-price group">
         <IconClock class="opacity-20" />
         <div class="flex flex-col group-hover:opacity-100">
           <span class="text-white opacity-20">Time</span>
-          <span class="text-white"
-            >{{ booking.start_time }} – {{ booking.end_time }}</span
-          >
+          <span class="text-white">{{ formattedTimeRange }}</span>
         </div>
       </div>
     </div>
@@ -80,12 +78,33 @@ import IconAddress from "~/src/shared/ui/common/Icon/IconAddress.vue"
 import { Clipboard } from "~/src/shared/ui/common/Clipboard"
 import defaultLogo from "~/src/shared/assets/image/studio.png"
 import { useApi } from "~/src/lib/api"
+import { computed } from "vue"
 
 const emit = defineEmits<{
   (e: "onCancelBooking"): void
   (e: "onFavoriteChange", bookingId: number): void
   (e: "manageBooking", booking: any): void
 }>()
+
+// Format date from "2025-11-14" to "14 Nov 2025"
+const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr)
+  const day = date.getDate()
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const month = months[date.getMonth()]
+  const year = date.getFullYear()
+  return `${day} ${month} ${year}`
+}
+
+// Format time from "18:00:00" to "18:00"
+const formatTime = (timeStr: string) => {
+  return timeStr.substring(0, 5) // Remove ":00" seconds
+}
+
+const formattedDate = computed(() => formatDate(props.booking.date))
+const formattedTimeRange = computed(() =>
+  `${formatTime(props.booking.start_time)} to ${formatTime(props.booking.end_time)}`
+)
 
 const manageBookingPopup = () => {
   emit("manageBooking", props.booking)

@@ -83,6 +83,7 @@ class Settings(BaseSettings):
     # Frontend URLs for emails
     frontend_url: str = "https://funny-how.com"
     unsubscribe_url: str = "https://funny-how.com/unsubscribe"
+    email_assets_base_url: str = "https://funny-how.com/mail"
 
     # Redis
     redis_url: str = "redis://redis:6379/0"

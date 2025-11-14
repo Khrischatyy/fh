@@ -29,7 +29,8 @@ class BookingManagementService:
         Cancel a booking with refund (Laravel-compatible).
 
         Business rules:
-        - Must be at least 6 hours before start time
+        - Studio owner: Can cancel anytime
+        - Customer: Can cancel only if more than 1 hour before start time
         - Only paid bookings (status_id=2) can be cancelled
         - Issues refund automatically
         - Updates status to cancelled (status_id=3)
@@ -61,32 +62,7 @@ class BookingManagementService:
         if not booking:
             raise NotFoundException(f"Booking with ID {booking_id} not found")
 
-        # Check if user owns the booking
-        if booking.user_id != user_id:
-            raise BadRequestException("You are not authorized to cancel this booking")
-
-        # Check if booking is paid (status_id=2)
-        if booking.status_id != 2:
-            raise BadRequestException("Only paid bookings can be cancelled")
-
-        # Check 6-hour cancellation rule
-        booking_datetime = datetime.combine(booking.date, booking.start_time)
-        if booking.room and booking.room.address and booking.room.address.timezone:
-            tz = pytz.timezone(booking.room.address.timezone)
-            booking_datetime = tz.localize(booking_datetime)
-        else:
-            tz = pytz.UTC
-            booking_datetime = pytz.UTC.localize(booking_datetime)
-
-        now = datetime.now(tz)
-        hours_until_booking = (booking_datetime - now).total_seconds() / 3600
-
-        if hours_until_booking < 6:
-            raise BadRequestException(
-                "Cannot cancel less than 6 hours before booking start time"
-            )
-
-        # Get studio owner for refund
+        # Get studio owner to check authorization
         from src.companies.models import AdminCompany
 
         stmt = select(AdminCompany).where(
@@ -99,6 +75,36 @@ class BookingManagementService:
             raise BadRequestException("Studio owner not found")
 
         studio_owner = admin_company.admin
+        is_studio_owner = (user_id == studio_owner.id)
+        is_booking_owner = (booking.user_id == user_id)
+
+        # Check authorization: user must be either studio owner OR booking owner
+        if not is_studio_owner and not is_booking_owner:
+            raise BadRequestException("You are not authorized to cancel this booking")
+
+        # Check if booking is paid (status_id=2)
+        if booking.status_id != 2:
+            raise BadRequestException("Only paid bookings can be cancelled")
+
+        # Apply time restrictions based on user role
+        if not is_studio_owner:
+            # Customer: Must cancel more than 1 hour before start time
+            booking_datetime = datetime.combine(booking.date, booking.start_time)
+            if booking.room and booking.room.address and booking.room.address.timezone:
+                tz = pytz.timezone(booking.room.address.timezone)
+                booking_datetime = tz.localize(booking_datetime)
+            else:
+                tz = pytz.UTC
+                booking_datetime = pytz.UTC.localize(booking_datetime)
+
+            now = datetime.now(tz)
+            hours_until_booking = (booking_datetime - now).total_seconds() / 3600
+
+            if hours_until_booking < 1:
+                raise BadRequestException(
+                    "Cannot cancel less than 1 hour before booking start time"
+                )
+        # Studio owner: No time restrictions (can cancel anytime)
 
         # Process refund
         from src.payments.service import PaymentService
@@ -106,7 +112,7 @@ class BookingManagementService:
         payment_service = PaymentService(self._session)
 
         try:
-            refund_result = await payment_service.process_refund(
+            refund_result = await payment_service.refund_payment(
                 booking=booking,
                 studio_owner=studio_owner
             )
@@ -119,7 +125,22 @@ class BookingManagementService:
         await self._session.refresh(booking)
 
         # Send cancellation email (background task)
-        # TODO: Dispatch BookingCancellationJob
+        from src.tasks.email import send_booking_cancellation
+
+        # Format booking details for email
+        booking_details = {
+            'studio_name': booking.room.address.company.name,
+            'room_name': booking.room.name,
+            'date': booking.date.strftime("%d %b %Y"),
+            'start_time': booking.start_time.strftime("%H:%M"),
+            'end_time': booking.end_time.strftime("%H:%M"),
+        }
+
+        send_booking_cancellation.delay(
+            email=booking.user.email,
+            firstname=booking.user.firstname,
+            booking_details=booking_details
+        )
 
         return {
             "booking": booking,
@@ -226,14 +247,14 @@ class BookingManagementService:
         admin_company = result.scalar_one_or_none()
 
         # Build base query
-        # Studio owners see ONLY bookings at their studios
-        # Regular users see their own bookings
+        # Show ALL bookings where user is involved:
+        # 1. Bookings they made as a customer (Booking.user_id == user_id)
+        # 2. Bookings at studios they own (Address.company_id == their company)
+        conditions = [Booking.user_id == user_id]
+
         if admin_company:
-            # Studio owner: Show only bookings at their studios
-            conditions = [Address.company_id == admin_company.company_id]
-        else:
-            # Regular user: Show their own bookings
-            conditions = [Booking.user_id == user_id]
+            # Studio owner: ALSO show bookings at their studios
+            conditions.append(Address.company_id == admin_company.company_id)
 
         stmt = (
             select(Booking)
@@ -327,6 +348,12 @@ class BookingManagementService:
         # Format bookings
         bookings_data = []
         for booking in bookings:
+            # Determine if current user is the studio owner of this booking
+            is_studio_owner = (
+                admin_company is not None and
+                booking.room.address.company_id == admin_company.company_id
+            )
+
             booking_dict = {
                 "id": booking.id,
                 "start_time": booking.start_time.strftime("%H:%M:%S"),
@@ -336,6 +363,7 @@ class BookingManagementService:
                 "user_id": booking.user_id,
                 "status_id": booking.status_id,
                 "device_id": booking.device_id,
+                "is_studio_owner": is_studio_owner,  # Frontend uses this to show status/device controls
                 "room": {
                     "id": booking.room.id,
                     "name": booking.room.name,
@@ -368,7 +396,7 @@ class BookingManagementService:
             }
 
             # Include user info if viewing as studio owner
-            if admin_company and booking.user:
+            if is_studio_owner and booking.user:
                 booking_dict["user"] = {
                     "id": booking.user.id,
                     "firstname": booking.user.firstname,

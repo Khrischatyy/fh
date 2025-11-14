@@ -141,6 +141,31 @@ services:
       - funny-how-network
     restart: always
 
+  # Celery Beat Scheduler (runs periodic tasks)
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: funny-how-celery-beat
+    command: celery -A src.tasks.celery_app beat --loglevel=info
+    volumes:
+      - ./backend:/app
+    env_file:
+      - ./.env
+    environment:
+      - APP_ENV=development
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/book_studio
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      - db
+      - redis
+      - celery_worker
+    networks:
+      - funny-how-network
+    restart: always
+
   # Chat Service (Socket.io)
   chat:
     build:

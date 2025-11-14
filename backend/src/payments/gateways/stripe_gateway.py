@@ -181,9 +181,62 @@ class StripeGateway(PaymentGateway):
             Decimal(amount_to_studio_cents) / 100  # Convert cents to dollars
         )
 
-        # TODO: Send confirmation emails via Celery
-        # dispatch(BookingConfirmationJob(booking, user_email, total_amount))
-        # dispatch(BookingConfirmationOwnerJob(booking, studio_owner, total_amount))
+        # Send confirmation emails via Celery
+        from src.tasks.email import send_booking_confirmation, send_booking_confirmation_owner
+        from sqlalchemy import select
+        from sqlalchemy.orm import selectinload
+        from src.bookings.models import Booking
+        from src.rooms.models import Room
+        from src.addresses.models import Address
+        from src.companies.models import Company
+
+        # Reload booking with all relationships
+        stmt = (
+            select(Booking)
+            .where(Booking.id == booking_id)
+            .options(
+                selectinload(Booking.user),
+                selectinload(Booking.room)
+                .selectinload(Room.address)
+                .selectinload(Address.company)
+            )
+        )
+        result = await self.db.execute(stmt)
+        booking_full = result.scalar_one_or_none()
+
+        if booking_full and booking_full.user:
+            # Format time for display (remove seconds)
+            start_time_formatted = booking_full.start_time.strftime("%H:%M")
+            end_time_formatted = booking_full.end_time.strftime("%H:%M")
+            date_formatted = booking_full.date.strftime("%d %b %Y")
+
+            # Prepare booking details for email
+            booking_details = {
+                'studio_name': booking_full.room.address.company.name,
+                'room_name': booking_full.room.name,
+                'studio_address': booking_full.room.address.street,
+                'date': date_formatted,
+                'start_time': start_time_formatted,
+                'end_time': end_time_formatted,
+                'amount': float(total_amount_cents) / 100
+            }
+
+            # Send customer confirmation
+            send_booking_confirmation.delay(
+                email=booking_full.user.email,
+                firstname=booking_full.user.firstname,
+                booking_details=booking_details
+            )
+
+            # Send owner notification
+            send_booking_confirmation_owner.delay(
+                email=studio_owner.email,
+                owner_name=studio_owner.firstname,
+                booking_details={
+                    **booking_details,
+                    'customer_name': f"{booking_full.user.firstname} {booking_full.user.lastname}"
+                }
+            )
 
         logger.info(f"Payment processed successfully for booking {booking_id}")
 

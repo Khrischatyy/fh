@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>New Booking Received</title>
+    <style>
+        body {
+            background-color: #f2f2f2;
+            font-family: 'Roboto', sans-serif;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #000000 !important;
+            color: #ffffff !important;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .center {
+            text-align: center;
+        }
+        .button {
+            display: inline-block;
+            width: 100%;
+            height: 44px;
+            background-color: #ffffff;
+            color: #333333;
+            border-radius: 10px;
+            text-align: center;
+            line-height: 44px;
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            text-decoration: none;
+            transition: opacity 0.3s;
+        }
+        .button:hover {
+            opacity: 0.9;
+        }
+        .info-box {
+            background-color: #1a1a1a;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+            <td align="center" valign="top">
+                <table class="email-container" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                        <td class="center" style="padding: 20px 0;">
+                            <img src="https://funny-how.com/mail/logo.png" style="width: 110px;">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="center" style="padding: 20px; font-size: 18px; color: #fff !important;">
+                            <h1 style="color: #ffffff !important; font-size: 24px; font-weight: 700; margin-bottom: 20px;">You Got a Booking</h1>
+                            <p>{{ owner_name }}, listen up.</p>
+                            <p>Someone just booked your studio. Here's what you need to know:</p>
+
+                            <div class="info-box">
+                                <p style="margin: 5px 0;"><strong>Customer:</strong> {{ customer_name }}</p>
+                                <p style="margin: 5px 0;"><strong>Studio:</strong> {{ studio_name }}</p>
+                                <p style="margin: 5px 0;"><strong>Room:</strong> {{ room_name }}</p>
+                                <p style="margin: 5px 0;"><strong>Date:</strong> {{ booking_date }}</p>
+                                <p style="margin: 5px 0;"><strong>Time:</strong> {{ start_time }} to {{ end_time }}</p>
+                                <p style="margin: 5px 0;"><strong>Amount:</strong> ${{ amount }}</p>
+                            </div>
+
+                            <p><strong>Make sure everything's ready.</strong> Customer's counting on you.</p>
+                            <p>Check your calendar. Respond if they message you. Show up on time.</p>
+                            <p>That's the business.</p>
+
+                            <div style="padding: 10px; text-align: center; margin-top: 20px;">
+                                <p>
+                                    <a href="{{ bookings_url }}" class="button">View Booking Details</a>
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="center" style="padding: 20px 0; margin-top: 20px; font-size: 12px; color: #cccccc !important;">
+                            &copy; 2024 Funny How. All rights reserved.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="center" style="padding: 5px 0;">
+                            <a style="font-size: 12px; color: #cccccc !important;" href="{{ unsubscribe_url }}">Unsubscribe</a>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
