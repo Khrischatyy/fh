@@ -289,6 +289,10 @@ app.include_router(messages_router, prefix=settings.api_prefix)
 from src.devices.router import router as devices_router
 app.include_router(devices_router, prefix=settings.api_prefix)
 
+# Downloads router
+from src.downloads.router import router as downloads_router
+app.include_router(downloads_router, prefix=settings.api_prefix)
+
 
 # Setup MCP server (Model Context Protocol)
 # IMPORTANT: Must be called AFTER all routers are registered

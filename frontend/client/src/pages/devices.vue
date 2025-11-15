@@ -36,9 +36,9 @@
                   <span>{{ isGeneratingToken ? 'Generating...' : 'Generate Token' }}</span>
                 </button>
                 <a
-                  href="/downloads/FunnyHow-DeviceMonitor.dmg"
+                  href="/api/downloads/FunnyHow-DeviceMonitor.dmg"
                   class="px-6 py-3 bg-neutral-800 text-white rounded-lg hover:bg-neutral-700 transition-all font-medium flex items-center justify-center gap-2 border border-neutral-700"
-                  target="_blank"
+                  download="FunnyHow-DeviceMonitor.dmg"
                 >
                   <span>Download App</span>
                 </a>
