@@ -2,11 +2,11 @@
 
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import select, update
+from sqlalchemy import select, update, and_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
-from src.devices.models import Device, DeviceLog
+from src.devices.models import Device, DeviceLog, DeviceUnlockSession
 
 
 class DeviceRepository:
@@ -151,3 +151,87 @@ class DeviceRepository:
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none() is not None
+
+    # ============================================
+    # Unlock Session Methods
+    # ============================================
+
+    async def create_unlock_session(self, session_data: dict) -> DeviceUnlockSession:
+        """Create a new unlock session."""
+        unlock_session = DeviceUnlockSession(**session_data)
+        self.db.add(unlock_session)
+        await self.db.commit()
+        await self.db.refresh(unlock_session)
+        return unlock_session
+
+    async def get_unlock_session_by_stripe_id(self, stripe_session_id: str) -> Optional[DeviceUnlockSession]:
+        """Get unlock session by Stripe session ID."""
+        result = await self.db.execute(
+            select(DeviceUnlockSession)
+            .options(joinedload(DeviceUnlockSession.device))
+            .where(DeviceUnlockSession.stripe_session_id == stripe_session_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def update_unlock_session(self, session_id: int, update_data: dict) -> Optional[DeviceUnlockSession]:
+        """Update unlock session information."""
+        await self.db.execute(
+            update(DeviceUnlockSession)
+            .where(DeviceUnlockSession.id == session_id)
+            .values(**update_data)
+        )
+        await self.db.commit()
+        result = await self.db.execute(
+            select(DeviceUnlockSession).where(DeviceUnlockSession.id == session_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def has_active_unlock_session(self, device_id: int) -> bool:
+        """
+        Check if device has an active paid unlock session.
+
+        Returns True if there's a paid session that hasn't expired yet.
+        """
+        now = datetime.now(timezone.utc)
+
+        stmt = (
+            select(DeviceUnlockSession)
+            .where(
+                and_(
+                    DeviceUnlockSession.device_id == device_id,
+                    DeviceUnlockSession.status == "paid",
+                    DeviceUnlockSession.expires_at > now
+                )
+            )
+            .limit(1)
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
+    async def get_active_unlock_session(self, device_id: int) -> Optional[DeviceUnlockSession]:
+        """Get the active paid unlock session for a device."""
+        now = datetime.now(timezone.utc)
+
+        stmt = (
+            select(DeviceUnlockSession)
+            .where(
+                and_(
+                    DeviceUnlockSession.device_id == device_id,
+                    DeviceUnlockSession.status == "paid",
+                    DeviceUnlockSession.expires_at > now
+                )
+            )
+            .order_by(DeviceUnlockSession.expires_at.desc())
+            .limit(1)
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_device_with_user(self, device_uuid: str) -> Optional[Device]:
+        """Get device with user relationship loaded."""
+        result = await self.db.execute(
+            select(Device)
+            .options(joinedload(Device.user))
+            .where(Device.device_uuid == device_uuid)
+        )
+        return result.scalar_one_or_none()
