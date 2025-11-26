@@ -1,6 +1,7 @@
 """Pydantic schemas for device management."""
 
 from datetime import datetime as datetime_type
+from decimal import Decimal
 from typing import Optional
 from pydantic import BaseModel, Field, validator
 
@@ -23,6 +24,7 @@ class DeviceUpdateRequest(BaseModel):
     notes: Optional[str] = None
     unlock_password: Optional[str] = Field(None, min_length=6)
     is_active: Optional[bool] = None
+    unlock_fee: Optional[Decimal] = Field(None, ge=1.00, le=1000.00, description="Unlock fee in USD")
 
 
 class DeviceHeartbeatRequest(BaseModel):
@@ -56,6 +58,7 @@ class DeviceResponse(BaseModel):
     os_version: Optional[str]
     app_version: Optional[str]
     notes: Optional[str]
+    unlock_fee: Decimal = Decimal("10.00")
     created_at: datetime_type
 
     class Config:
@@ -94,3 +97,40 @@ class DeviceUnlockRequest(BaseModel):
 
     device_uuid: str
     password: str
+
+
+# Payment Link Schemas
+class DevicePaymentLinkRequest(BaseModel):
+    """Request schema for generating a Cash App payment link."""
+
+    device_uuid: str = Field(..., description="Device UUID")
+    device_token: str = Field(..., description="Device authentication token")
+
+
+class DevicePaymentLinkResponse(BaseModel):
+    """Response schema for payment link generation."""
+
+    success: bool = True
+    payment_url: str = Field(..., description="Stripe Checkout URL for Cash App payment")
+    session_id: str = Field(..., description="Stripe session ID")
+    amount: Decimal = Field(..., description="Payment amount in USD")
+    expires_in_minutes: int = Field(30, description="Minutes until link expires")
+    message: str = "Payment link generated successfully"
+    code: int = 200
+
+
+class DeviceUnlockSessionResponse(BaseModel):
+    """Response schema for unlock session info."""
+
+    id: int
+    device_id: int
+    stripe_session_id: str
+    amount: Decimal
+    status: str
+    unlock_duration_hours: int
+    paid_at: Optional[datetime_type]
+    expires_at: Optional[datetime_type]
+    created_at: datetime_type
+
+    class Config:
+        from_attributes = True

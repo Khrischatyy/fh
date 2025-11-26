@@ -18,6 +18,8 @@ from src.devices.schemas import (
     DeviceStatusResponse,
     DeviceHeartbeatRequest,
     DeviceUnlockRequest,
+    DevicePaymentLinkRequest,
+    DevicePaymentLinkResponse,
 )
 from src.auth.schemas import DeviceRegisterWithTokenRequest
 from src.auth.service import auth_service
@@ -232,3 +234,34 @@ async def unlock_device_with_password(
         "message": "Device unlocked successfully",
         "code": 200
     }
+
+
+@router.post("/payment-link", response_model=DevicePaymentLinkResponse)
+async def generate_payment_link(
+    payment_data: DevicePaymentLinkRequest,
+    service: DeviceService = Depends(get_device_service),
+):
+    """
+    Generate a Stripe Checkout payment link for device unlock via Cash App.
+
+    This endpoint is called by the macOS locker app when the device is locked.
+    The returned payment_url should be displayed as a QR code for the user to scan.
+
+    Payment is processed via Cash App ONLY. After successful payment:
+    - Stripe sends a webhook to /api/webhooks/stripe
+    - The device unlock session is marked as paid
+    - Device's next status check will return should_lock=false for 1 hour
+
+    No authentication required (uses device_uuid + device_token).
+    """
+    result = await service.generate_payment_link(
+        payment_data.device_uuid,
+        payment_data.device_token
+    )
+
+    return DevicePaymentLinkResponse(
+        payment_url=result['payment_url'],
+        session_id=result['session_id'],
+        amount=result['amount'],
+        expires_in_minutes=result['expires_in_minutes'],
+    )
