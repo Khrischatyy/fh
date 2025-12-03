@@ -26,6 +26,7 @@ from src.admin.views import (
     CityAdmin,
     ChargeAdmin,
     PayoutAdmin,
+    SupportTicketAdmin,
 )
 
 
@@ -88,6 +89,9 @@ def setup_admin(app, engine):
     # Register Payment views
     admin.add_view(ChargeAdmin)
     admin.add_view(PayoutAdmin)
+
+    # Register Support views
+    admin.add_view(SupportTicketAdmin)
 
     return admin
 
