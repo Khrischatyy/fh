@@ -19,7 +19,6 @@ from src.bookings.models import Booking, BookingStatus
 from src.geographic.models import Country, City
 from src.messages.models import Message
 from src.payments.models import Charge, Payout, SquareLocation, SquareToken
-from src.support.models import SupportTicket
 
 
 class UserAdmin(ModelView, model=User):
@@ -513,41 +512,6 @@ class SquareTokenAdmin(ModelView, model=SquareToken):
     ]
 
 
-class SupportTicketAdmin(ModelView, model=SupportTicket):
-    """Admin view for SupportTicket model."""
-
-    name = "Support Ticket"
-    name_plural = "Support Tickets"
-    icon = "fa-solid fa-ticket"
-    category = "Support"
-
-    column_list = [
-        SupportTicket.id,
-        SupportTicket.email,
-        SupportTicket.name,
-        SupportTicket.subject,
-        SupportTicket.status,
-        SupportTicket.priority,
-        SupportTicket.user_id,
-        SupportTicket.assigned_to_id,
-        SupportTicket.created_at,
-    ]
-    column_searchable_list = [SupportTicket.email, SupportTicket.name, SupportTicket.subject]
-    column_sortable_list = [SupportTicket.id, SupportTicket.created_at, SupportTicket.status, SupportTicket.priority]
-    column_default_sort = [(SupportTicket.created_at, True)]
-    column_filters = [SupportTicket.status, SupportTicket.priority, SupportTicket.user_id, SupportTicket.assigned_to_id]
-
-    # Allow deletion
-    can_delete = True
-
-    form_excluded_columns = [
-        SupportTicket.created_at,
-        SupportTicket.updated_at,
-        SupportTicket.user,
-        SupportTicket.assigned_to,
-    ]
-
-
 # Export all admin views
 __all__ = [
     "UserAdmin",
@@ -571,5 +535,4 @@ __all__ = [
     "CityAdmin",
     "ChargeAdmin",
     "PayoutAdmin",
-    "SupportTicketAdmin",
 ]

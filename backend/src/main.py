@@ -37,7 +37,6 @@ from src.bookings.models import Booking  # noqa: F401
 from src.messages.models import Message  # noqa: F401
 from src.payments.models import Charge, Payout, SquareLocation, SquareToken  # noqa: F401
 from src.devices.models import Device, DeviceLog, DeviceUnlockSession  # noqa: F401
-from src.support.models import SupportTicket  # noqa: F401
 
 # Import routers
 from src.auth.router import router as auth_router  # Custom Laravel-compatible auth
@@ -297,10 +296,6 @@ app.include_router(downloads_router, prefix=settings.api_prefix)
 # Webhooks router (Stripe, etc.)
 from src.webhooks.router import router as webhooks_router
 app.include_router(webhooks_router, prefix=settings.api_prefix)
-
-# Support tickets router
-from src.support.router import router as support_router
-app.include_router(support_router, prefix=settings.api_prefix)
 
 
 # Setup MCP server (Model Context Protocol)

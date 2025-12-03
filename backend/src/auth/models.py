@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from src.messages.models import Message
     from src.payments.models import Payout, SquareToken
     from src.addresses.models import Address
-    from src.support.models import SupportTicket
 
 
 class EngineerRate(Base, IDMixin):
@@ -153,7 +152,6 @@ class User(Base, IDMixin, TimestampMixin):
     engineer_addresses: Mapped[list["Address"]] = relationship("Address", secondary=engineer_addresses, lazy="select")
     engineer_rate: Mapped[Optional["EngineerRate"]] = relationship("EngineerRate", back_populates="user", lazy="select", uselist=False, cascade="all, delete-orphan")
     devices: Mapped[list["Device"]] = relationship("Device", back_populates="user", lazy="select")
-    support_tickets: Mapped[list["SupportTicket"]] = relationship("SupportTicket", back_populates="user", lazy="select", foreign_keys="SupportTicket.user_id")
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email})>"
