@@ -128,6 +128,8 @@ export default defineNuxtConfig({
       apiBaseClient: process.env.AXIOS_BASEURL_CLIENT
         ? process.env.AXIOS_BASEURL_CLIENT + process.env.AXIOS_API_VERSION
         : "",
+      supportUserId: process.env.SUPPORT_USER_ID || "1",
+      supportAddressId: process.env.SUPPORT_ADDRESS_ID || "1",
     },
   },
   tailwindcss: {
