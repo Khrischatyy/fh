@@ -98,11 +98,10 @@ definePageMeta({
 const config = useRuntimeConfig()
 const session = useSessionStore()
 
-// Support configuration - these should be set up in your system
-// Support user ID: The user account that handles support (create an admin/support user)
-// Support address ID: A dummy address for the support chat context
-const SUPPORT_USER_ID = 1  // Change this to your support user's ID
-const SUPPORT_ADDRESS_ID = 1  // Change this to a valid address ID
+// Support configuration from environment variables
+// Set SUPPORT_USER_ID and SUPPORT_ADDRESS_ID in your .env file
+const SUPPORT_USER_ID = Number(config.public.supportUserId) || 1
+const SUPPORT_ADDRESS_ID = Number(config.public.supportAddressId) || 1
 
 const socket = ref<Socket | null>(null)
 const messages = ref<any[]>([])
