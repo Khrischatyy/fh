@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     secret_key: str = "change-this-to-a-secure-random-key-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
+    password_encryption_key: str = ""  # Fernet key for encrypting device passwords
 
     # CORS
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]

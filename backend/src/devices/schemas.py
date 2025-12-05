@@ -22,6 +22,7 @@ class DeviceUpdateRequest(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     notes: Optional[str] = None
     unlock_password: Optional[str] = Field(None, min_length=6)
+    current_password: Optional[str] = Field(None, min_length=6, max_length=255, description="Current macOS password for device")
     is_active: Optional[bool] = None
 
 
@@ -56,6 +57,8 @@ class DeviceResponse(BaseModel):
     os_version: Optional[str]
     app_version: Optional[str]
     notes: Optional[str]
+    current_password: Optional[str]
+    password_changed_at: Optional[datetime_type]
     created_at: datetime_type
 
     class Config:
@@ -94,3 +97,22 @@ class DeviceUnlockRequest(BaseModel):
 
     device_uuid: str
     password: str
+
+
+class StorePasswordRequest(BaseModel):
+    """Request schema for storing device password."""
+
+    device_uuid: str = Field(..., description="Device UUID")
+    device_token: str = Field(..., description="Device authentication token")
+    password: str = Field(..., min_length=1, description="Current macOS user password (will be encrypted)")
+
+
+class DevicePasswordResponse(BaseModel):
+    """Response schema for device password retrieval."""
+
+    password: str = Field(..., description="Current macOS user password (decrypted)")
+    password_changed_at: Optional[datetime_type] = Field(None, description="When password was last changed")
+    device_name: str = Field(..., description="Device name for reference")
+
+    class Config:
+        from_attributes = True

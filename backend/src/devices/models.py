@@ -38,6 +38,10 @@ class Device(Base, IDMixin, TimestampMixin):
     # Unlock password (hashed)
     unlock_password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
+    # Current password (encrypted) - for automatic password rotation
+    current_password: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    password_changed_at: Mapped[datetime_type | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Notes
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 

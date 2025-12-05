@@ -3,7 +3,9 @@
 import secrets
 import hashlib
 from typing import Optional
+from datetime import datetime
 from passlib.context import CryptContext
+from cryptography.fernet import Fernet
 
 from src.devices.repository import DeviceRepository
 from src.devices.models import Device
@@ -12,8 +14,11 @@ from src.devices.schemas import (
     DeviceUpdateRequest,
     DeviceHeartbeatRequest,
     DeviceStatusResponse,
+    StorePasswordRequest,
+    DevicePasswordResponse,
 )
 from src.exceptions import NotFoundException, ConflictException, UnauthorizedException
+from src.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -35,6 +40,40 @@ class DeviceService:
     def _verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """Verify a password against a hash."""
         return pwd_context.verify(plain_password, hashed_password)
+
+    def _encrypt_password(self, password: str) -> str:
+        """
+        Encrypt a password using Fernet symmetric encryption.
+
+        Args:
+            password: Plain text password
+
+        Returns:
+            Encrypted password (base64 encoded)
+        """
+        if not settings.password_encryption_key:
+            raise ValueError("PASSWORD_ENCRYPTION_KEY is not configured")
+
+        fernet = Fernet(settings.password_encryption_key.encode())
+        encrypted = fernet.encrypt(password.encode())
+        return encrypted.decode()
+
+    def _decrypt_password(self, encrypted_password: str) -> str:
+        """
+        Decrypt a password using Fernet symmetric encryption.
+
+        Args:
+            encrypted_password: Encrypted password (base64 encoded)
+
+        Returns:
+            Decrypted plain text password
+        """
+        if not settings.password_encryption_key:
+            raise ValueError("PASSWORD_ENCRYPTION_KEY is not configured")
+
+        fernet = Fernet(settings.password_encryption_key.encode())
+        decrypted = fernet.decrypt(encrypted_password.encode())
+        return decrypted.decode()
 
     async def register_device(
         self, user_id: int, device_data: DeviceRegisterRequest, ip_address: str
@@ -98,19 +137,31 @@ class DeviceService:
         return device, device_token
 
     async def get_user_devices(self, user_id: int) -> list[Device]:
-        """Get all devices for a user."""
-        return await self.repository.get_devices_by_user(user_id)
+        """Get all devices for a user with decrypted passwords."""
+        devices = await self.repository.get_devices_by_user(user_id)
+
+        # Expunge and decrypt passwords for all devices
+        for device in devices:
+            self.repository.db.expunge(device)
+            if device.current_password:
+                try:
+                    device.current_password = self._decrypt_password(device.current_password)
+                except Exception:
+                    # If decryption fails, leave as None
+                    device.current_password = None
+
+        return devices
 
     async def get_device(self, device_id: int, user_id: int) -> Device:
         """
-        Get a device by ID.
+        Get a device by ID with decrypted password.
 
         Args:
             device_id: Device ID
             user_id: User ID (for ownership check)
 
         Returns:
-            Device
+            Device with decrypted password
 
         Raises:
             NotFoundException: If device not found
@@ -123,12 +174,25 @@ class DeviceService:
         if device.user_id != user_id:
             raise UnauthorizedException("You don't have permission to access this device")
 
+        # Expunge from session to prevent tracking changes
+        self.repository.db.expunge(device)
+
+        # Decrypt password if present
+        if device.current_password:
+            try:
+                device.current_password = self._decrypt_password(device.current_password)
+            except Exception:
+                # If decryption fails, leave as None
+                device.current_password = None
+
         return device
 
     async def update_device(
         self, device_id: int, user_id: int, update_data: DeviceUpdateRequest
     ) -> Device:
         """Update device information."""
+        from datetime import datetime, timezone
+
         device = await self.get_device(device_id, user_id)
 
         update_dict = {}
@@ -140,9 +204,22 @@ class DeviceService:
             update_dict["is_active"] = update_data.is_active
         if update_data.unlock_password is not None:
             update_dict["unlock_password_hash"] = self._hash_password(update_data.unlock_password)
+        if update_data.current_password is not None:
+            # Encrypt password before storing (will be decrypted by locker app)
+            update_dict["current_password"] = self._encrypt_password(update_data.current_password)
+            update_dict["password_changed_at"] = datetime.now(timezone.utc)
 
         if update_dict:
             device = await self.repository.update_device(device_id, update_dict)
+            # Expunge from session to prevent SQLAlchemy from tracking changes
+            self.repository.db.expunge(device)
+
+        # Decrypt password for response
+        if device.current_password:
+            try:
+                device.current_password = self._decrypt_password(device.current_password)
+            except Exception:
+                device.current_password = None
 
         return device
 
@@ -305,3 +382,116 @@ class DeviceService:
         })
 
         return True
+
+    async def store_device_password(
+        self, password_data: StorePasswordRequest
+    ) -> bool:
+        """
+        Store encrypted device password (called by locker app after changing macOS password).
+
+        Args:
+            password_data: Password storage request data
+
+        Returns:
+            True if password stored successfully
+
+        Raises:
+            UnauthorizedException: If device not found or token invalid
+        """
+        device = await self.repository.get_device_by_uuid(password_data.device_uuid)
+
+        if not device:
+            raise UnauthorizedException("Device not found")
+
+        if device.device_token != password_data.device_token:
+            raise UnauthorizedException("Invalid device token")
+
+        # Encrypt password before storing
+        encrypted_password = self._encrypt_password(password_data.password)
+
+        # Update device with encrypted password
+        await self.repository.update_device(device.id, {
+            "current_password": encrypted_password,
+            "password_changed_at": datetime.utcnow()
+        })
+
+        # Log password change
+        await self.repository.create_device_log({
+            "device_id": device.id,
+            "action": "password_changed",
+            "details": "macOS password changed automatically",
+            "ip_address": None,
+        })
+
+        return True
+
+    async def get_device_password(
+        self, device_id: int, user_id: int
+    ) -> DevicePasswordResponse:
+        """
+        Get decrypted device password (studio owner only).
+
+        Args:
+            device_id: Device ID
+            user_id: User ID (for ownership check)
+
+        Returns:
+            DevicePasswordResponse with decrypted password
+
+        Raises:
+            NotFoundException: If device not found or no password stored
+            UnauthorizedException: If user doesn't own the device
+        """
+        device = await self.get_device(device_id, user_id)
+
+        if not device.current_password:
+            raise NotFoundException("No password stored for this device")
+
+        # Decrypt password
+        decrypted_password = self._decrypt_password(device.current_password)
+
+        return DevicePasswordResponse(
+            password=decrypted_password,
+            password_changed_at=device.password_changed_at,
+            device_name=device.name
+        )
+
+    async def get_device_password_by_token(
+        self, device_uuid: str, device_token: str
+    ) -> DevicePasswordResponse:
+        """
+        Get decrypted device password using device token (for locker app).
+
+        Args:
+            device_uuid: Device UUID
+            device_token: Device authentication token
+
+        Returns:
+            DevicePasswordResponse with decrypted password
+
+        Raises:
+            UnauthorizedException: If device not found or token invalid
+            NotFoundException: If no password stored
+        """
+        device = await self.repository.get_device_by_uuid(device_uuid)
+
+        if not device:
+            raise UnauthorizedException("Device not found")
+
+        if device.device_token != device_token:
+            raise UnauthorizedException("Invalid device token")
+
+        if not device.is_active:
+            raise UnauthorizedException("Device is deactivated")
+
+        if not device.current_password:
+            raise NotFoundException("No password stored for this device")
+
+        # Decrypt password
+        decrypted_password = self._decrypt_password(device.current_password)
+
+        return DevicePasswordResponse(
+            password=decrypted_password,
+            password_changed_at=device.password_changed_at,
+            device_name=device.name
+        )

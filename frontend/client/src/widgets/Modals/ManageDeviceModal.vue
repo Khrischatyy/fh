@@ -19,6 +19,8 @@ interface Device {
   os_version: string | null
   app_version: string | null
   notes: string | null
+  current_password: string | null
+  password_changed_at: string | null
   created_at: string
 }
 
@@ -37,7 +39,31 @@ const isSaving = ref(false)
 
 const formData = ref({
   name: '',
+  current_password: '',
 })
+
+const showPassword = ref(false)
+const passwordCopied = ref(false)
+
+const generatePassword = () => {
+  const length = 12
+  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+  let password = ""
+  for (let i = 0; i < length; i++) {
+    password += charset.charAt(Math.floor(Math.random() * charset.length))
+  }
+  formData.value.current_password = password
+}
+
+const copyPassword = async () => {
+  if (formData.value.current_password) {
+    await navigator.clipboard.writeText(formData.value.current_password)
+    passwordCopied.value = true
+    setTimeout(() => {
+      passwordCopied.value = false
+    }, 2000)
+  }
+}
 
 const emit = defineEmits<{
   (e: "togglePopup"): void
@@ -63,6 +89,7 @@ const handleSave = async () => {
 
     const dataToSend = {
       name: formData.value.name,
+      current_password: formData.value.current_password || null,
     }
 
     const response = await updateDevice(dataToSend)
@@ -141,6 +168,7 @@ watch(() => props.device, (newDevice) => {
   if (newDevice && props.showPopup) {
     formData.value = {
       name: newDevice.name || '',
+      current_password: newDevice.current_password || '',
     }
   }
 }, { immediate: true })
@@ -224,6 +252,48 @@ watch(() => props.device, (newDevice) => {
               v-model="formData.name"
               placeholder="Enter device name"
             />
+          </div>
+
+          <!-- Device Password -->
+          <div>
+            <label class="text-white opacity-20 text-sm font-normal tracking-wide">Device Password</label>
+            <div class="flex gap-2">
+              <div class="relative flex-1">
+                <FInputClassic
+                  :wide="true"
+                  :type="showPassword ? 'text' : 'password'"
+                  v-model="formData.current_password"
+                  placeholder="Enter or generate password"
+                  class="pr-20"
+                />
+                <button
+                  @click="showPassword = !showPassword"
+                  type="button"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-white opacity-40 hover:opacity-100 text-xs"
+                >
+                  {{ showPassword ? 'Hide' : 'Show' }}
+                </button>
+              </div>
+              <button
+                @click="generatePassword"
+                type="button"
+                class="px-4 py-2 bg-white bg-opacity-10 hover:bg-opacity-20 rounded-[10px] text-white text-sm font-medium tracking-wide whitespace-nowrap"
+              >
+                Generate
+              </button>
+              <button
+                v-if="formData.current_password"
+                @click="copyPassword"
+                type="button"
+                class="px-4 py-2 bg-white bg-opacity-10 hover:bg-opacity-20 rounded-[10px] text-white text-sm font-medium tracking-wide"
+                :class="passwordCopied ? 'bg-green-700' : ''"
+              >
+                {{ passwordCopied ? '✓' : 'Copy' }}
+              </button>
+            </div>
+            <p v-if="device.password_changed_at" class="text-white opacity-20 text-xs mt-1">
+              Last changed: {{ new Date(device.password_changed_at).toLocaleString() }}
+            </p>
           </div>
         </div>
       </div>
