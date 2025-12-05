@@ -53,8 +53,8 @@ io.use(async (socket, next) => {
     }
 
     try {
-        console.log('[chat] Auth middleware - requesting /api/v1/user/me ...');
-        const response = await axios.get('http://nginx/api/v1/user/me', {
+        console.log('[chat] Auth middleware - requesting /api/user/me ...');
+        const response = await axios.get('http://nginx/api/user/me', {
             headers: {
                 Authorization: `Bearer ${token}`,
                 Accept: 'application/json'
