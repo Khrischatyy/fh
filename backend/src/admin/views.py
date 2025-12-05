@@ -19,6 +19,7 @@ from src.bookings.models import Booking, BookingStatus
 from src.geographic.models import Country, City
 from src.messages.models import Message
 from src.payments.models import Charge, Payout, SquareLocation, SquareToken
+from src.devices.models import Device, DeviceLog
 
 
 class UserAdmin(ModelView, model=User):
@@ -512,6 +513,66 @@ class SquareTokenAdmin(ModelView, model=SquareToken):
     ]
 
 
+class DeviceAdmin(ModelView, model=Device):
+    """Admin view for Device model."""
+
+    name = "Device"
+    name_plural = "Devices"
+    icon = "fa-solid fa-desktop"
+    category = "Devices"
+
+    column_list = [
+        Device.id,
+        Device.name,
+        Device.mac_address,
+        Device.user_id,
+        Device.is_blocked,
+        Device.is_active,
+        Device.last_heartbeat,
+        Device.last_ip,
+        Device.created_at,
+    ]
+    column_searchable_list = [Device.name, Device.mac_address, Device.device_uuid]
+    column_sortable_list = [Device.id, Device.name, Device.last_heartbeat, Device.created_at]
+    column_filters = [Device.user_id, Device.is_blocked, Device.is_active]
+
+    # Allow deletion (cascading is handled by database)
+    can_delete = True
+
+    form_excluded_columns = [
+        Device.created_at,
+        Device.updated_at,
+        Device.device_token,
+        Device.bookings,
+    ]
+
+
+class DeviceLogAdmin(ModelView, model=DeviceLog):
+    """Admin view for DeviceLog model."""
+
+    name = "Device Log"
+    name_plural = "Device Logs"
+    icon = "fa-solid fa-list-check"
+    category = "Devices"
+
+    column_list = [
+        DeviceLog.id,
+        DeviceLog.device_id,
+        DeviceLog.action,
+        DeviceLog.ip_address,
+        DeviceLog.created_at,
+    ]
+    column_searchable_list = [DeviceLog.action]
+    column_sortable_list = [DeviceLog.id, DeviceLog.created_at]
+    column_filters = [DeviceLog.device_id, DeviceLog.action]
+
+    form_excluded_columns = [
+        DeviceLog.created_at,
+        DeviceLog.updated_at,
+        DeviceLog.device,
+    ]
+
+
 # Export all admin views
 __all__ = [
     "UserAdmin",
@@ -535,4 +596,6 @@ __all__ = [
     "CityAdmin",
     "ChargeAdmin",
     "PayoutAdmin",
+    "DeviceAdmin",
+    "DeviceLogAdmin",
 ]

@@ -34,6 +34,8 @@ services:
         - AXIOS_BASEURL_CLIENT=https://funny-how.com
         - AXIOS_API_VERSION=/api
         - NUXT_ENV_GOOGLE_MAPS_API=${GOOGLE_MAPS_API}
+        - NUXT_PUBLIC_SUPPORT_USER_ID=${SUPPORT_USER_ID}
+        - NUXT_PUBLIC_SUPPORT_ADDRESS_ID=${SUPPORT_ADDRESS_ID}
     container_name: funny-how-frontend-prod
     expose:
       - "3000"
@@ -44,6 +46,8 @@ services:
       - AXIOS_BASEURL_CLIENT=https://funny-how.com
       - AXIOS_API_VERSION=/api
       - NUXT_PUBLIC_API_BASE=http://caddy/api
+      - NUXT_PUBLIC_SUPPORT_USER_ID=${SUPPORT_USER_ID}
+      - NUXT_PUBLIC_SUPPORT_ADDRESS_ID=${SUPPORT_ADDRESS_ID}
     networks:
       - funny-how-network
     restart: unless-stopped
@@ -194,6 +198,7 @@ services:
       - "6001"
     environment:
       - NODE_ENV=production
+      - API_HOST=api:8000
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}

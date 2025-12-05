@@ -28,12 +28,18 @@
           <div class="p-4 border-b border-white border-opacity-20 flex justify-between items-center">
             <h2 class="text-white text-xl font-[BebasNeue]">Support Chat</h2>
             <div class="flex items-center gap-2">
-              <span :class="['w-2 h-2 rounded-full', isConnected ? 'bg-green-500' : 'bg-red-500']"></span>
-              <span class="text-white/60 text-sm">{{ isConnected ? 'Connected' : 'Connecting...' }}</span>
+              <span v-if="isConnecting" class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+              <span v-else :class="['w-2 h-2 rounded-full', isConnected ? 'bg-green-500' : 'bg-red-500']"></span>
+              <span class="text-white/60 text-sm">
+                {{ isConnecting ? 'Connecting...' : (isConnected ? 'Connected' : 'Disconnected') }}
+              </span>
             </div>
           </div>
 
-          <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4">
+          <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 messages-container">
+            <div v-if="error" class="text-center text-red-500 mb-4">
+              {{ error }}
+            </div>
             <div v-if="messages.length === 0" class="text-center text-gray-400 mt-10">
               No messages yet. Start the conversation with our support team!
             </div>
@@ -41,7 +47,7 @@
                  :class="['message mb-4 flex flex-col', message.isOwn ? 'items-end' : 'items-start']">
               <div :class="['message-content', message.isOwn ? 'own-bubble' : 'other-bubble']">
                 <span class="sender-label text-xs font-bold block mb-1">{{ message.isOwn ? 'You' : 'Support' }}</span>
-                {{ message.text || message.message || message.content }}
+                {{ message.text }}
               </div>
               <div class="message-time">
                 {{ formatTime(message.createdAt) }}
@@ -53,15 +59,16 @@
             <div class="flex gap-2">
               <input
                 v-model="newMessage"
-                @keyup.enter="sendMessage"
+                @keyup.enter="handleSendMessage"
                 type="text"
                 placeholder="Type your message..."
-                class="flex-1 px-3 py-2 rounded-lg bg-[#232323] text-white border border-white border-opacity-20 focus:border-white focus:outline-none placeholder-gray-400"
+                :disabled="!isConnected"
+                class="flex-1 px-3 py-2 rounded-lg bg-[#232323] text-white border border-white border-opacity-20 focus:border-white focus:outline-none placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <button
-                @click="sendMessage"
+                @click="handleSendMessage"
                 :disabled="!newMessage.trim() || !isConnected"
-                class="px-4 py-2 rounded-lg bg-white text-black font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                class="px-4 py-2 rounded-lg bg-white text-black font-medium hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
               >
                 Send
               </button>
@@ -85,11 +92,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import { io, Socket } from 'socket.io-client'
+import { ref } from 'vue'
 import { IconLeft } from '~/src/shared/ui/common'
-import { navigateTo, definePageMeta, useRuntimeConfig } from '#app'
+import { navigateTo, definePageMeta, useRuntimeConfig } from '#imports'
 import { useSessionStore } from '~/src/entities/Session'
+import { useChat } from '~/src/composables/useChat'
 
 definePageMeta({
   layout: 'error',
@@ -99,124 +106,32 @@ const config = useRuntimeConfig()
 const session = useSessionStore()
 
 // Support configuration from environment variables
-// Set SUPPORT_USER_ID and SUPPORT_ADDRESS_ID in your .env file
 const SUPPORT_USER_ID = Number(config.public.supportUserId) || 1
-const SUPPORT_ADDRESS_ID = Number(config.public.supportAddressId) || 1
+const SUPPORT_ADDRESS_ID = Number(config.public.supportAddressId) || 4
 
-const socket = ref<Socket | null>(null)
-const messages = ref<any[]>([])
 const newMessage = ref('')
-const isConnected = ref(false)
 const messagesContainer = ref<HTMLElement | null>(null)
 
-const connectSocket = () => {
-  if (!session.isAuthorized) return
+// Use the chat composable
+const {
+  messages,
+  isConnected,
+  isConnecting,
+  error,
+  sendMessage,
+  formatTime
+} = useChat({
+  recipientId: SUPPORT_USER_ID,
+  addressId: SUPPORT_ADDRESS_ID,
+  autoConnect: true // Auto-connect when authorized
+})
 
-  try {
-    console.log('[support-chat] Connecting to WebSocket...')
-    const host = window.location.origin
-    const token = session.accessToken
+const handleSendMessage = () => {
+  if (!newMessage.value.trim() || !isConnected.value) return
 
-    socket.value = io(host, {
-      path: '/socket.io/',
-      auth: { token },
-      transports: ['websocket', 'polling']
-    })
-
-    socket.value.on('connect', () => {
-      console.log('[support-chat] Connected')
-      isConnected.value = true
-      // Load message history
-      socket.value?.emit('get-message-history', {
-        addressId: SUPPORT_ADDRESS_ID,
-        recipientId: SUPPORT_USER_ID
-      })
-    })
-
-    socket.value.on('connect_error', (error) => {
-      console.error('[support-chat] Connection error:', error)
-      isConnected.value = false
-    })
-
-    socket.value.on('disconnect', () => {
-      console.log('[support-chat] Disconnected')
-      isConnected.value = false
-    })
-
-    socket.value.on('new-message', (message) => {
-      console.log('[support-chat] New message:', message)
-      messages.value.push({
-        ...message,
-        text: message.text || message.message || message.content,
-        isOwn: Number(message.senderId ?? message.sender_id) === Number(session.user?.id),
-        createdAt: message.createdAt || message.created_at || message.timestamp
-      })
-      scrollToBottom()
-    })
-
-    socket.value.on('message-history', (history) => {
-      console.log('[support-chat] History loaded:', history?.length || 0, 'messages')
-      messages.value = (history || []).map((msg: any) => ({
-        ...msg,
-        text: msg.text || msg.message || msg.content,
-        isOwn: Number(msg.senderId ?? msg.sender_id) === Number(session.user?.id),
-        createdAt: msg.createdAt || msg.created_at || msg.timestamp
-      }))
-      scrollToBottom()
-    })
-
-  } catch (error) {
-    console.error('[support-chat] Error:', error)
-  }
-}
-
-const sendMessage = () => {
-  if (!newMessage.value.trim() || !socket.value || !isConnected.value) return
-
-  socket.value.emit('private-message', {
-    recipientId: SUPPORT_USER_ID,
-    message: newMessage.value,
-    addressId: SUPPORT_ADDRESS_ID
-  })
-
-  // Optimistically add message to UI
-  messages.value.push({
-    id: Date.now(),
-    text: newMessage.value,
-    isOwn: true,
-    createdAt: new Date().toISOString()
-  })
-
+  sendMessage(newMessage.value)
   newMessage.value = ''
-  scrollToBottom()
 }
-
-const scrollToBottom = () => {
-  nextTick(() => {
-    if (messagesContainer.value) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-    }
-  })
-}
-
-const formatTime = (timestamp: string) => {
-  if (!timestamp) return ''
-  const date = new Date(timestamp)
-  if (isNaN(date.getTime())) return ''
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-onMounted(() => {
-  if (session.isAuthorized) {
-    connectSocket()
-  }
-})
-
-onUnmounted(() => {
-  if (socket.value) {
-    socket.value.disconnect()
-  }
-})
 </script>
 
 <style scoped>

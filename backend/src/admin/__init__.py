@@ -26,6 +26,8 @@ from src.admin.views import (
     CityAdmin,
     ChargeAdmin,
     PayoutAdmin,
+    DeviceAdmin,
+    DeviceLogAdmin,
 )
 
 
@@ -88,6 +90,10 @@ def setup_admin(app, engine):
     # Register Payment views
     admin.add_view(ChargeAdmin)
     admin.add_view(PayoutAdmin)
+
+    # Register Device views
+    admin.add_view(DeviceAdmin)
+    admin.add_view(DeviceLogAdmin)
 
     return admin
 

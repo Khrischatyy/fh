@@ -56,7 +56,7 @@
                 >
                   <span class="sender-label text-xs font-bold block mb-1" v-if="message.sender_id === currentUserId">You</span>
                   <span class="sender-label text-xs font-bold block mb-1" v-else>{{ chat?.customer_name || 'User' }}</span>
-                  <p class="text-sm">{{ message.content }}</p>
+                  <p class="text-sm">{{ message.text }}</p>
                 </div>
                 <p class="message-time text-xs mt-1 text-gray-400">
                   {{ formatTime(message.created_at) }}
@@ -171,7 +171,7 @@ import { io } from 'socket.io-client'
 
 type Message = {
   id: number
-  content: string
+  text: string
   sender_id: number
   recipient_id: number
   address_id: number
@@ -262,13 +262,25 @@ const connectSocket = () => {
       isConnected.value = false
     })
 
-    socket.value.on('new-message', (message: Message) => {
+    socket.value.on('new-message', (message: any) => {
       console.log('[chat][debug] new-message received:', message)
 
+      // Normalize field names (Socket.io sends "message", we expect "text")
+      const normalizedMessage: Message = {
+        id: message.id,
+        text: message.message || message.content || message.text || '',
+        sender_id: message.senderId || message.sender_id,
+        recipient_id: message.recipientId || message.recipient_id,
+        address_id: message.addressId || message.address_id,
+        is_read: message.is_read || false,
+        created_at: message.createdAt || message.created_at,
+        updated_at: message.updatedAt || message.updated_at || message.createdAt || message.created_at
+      }
+
       // Deduplicate: check if message already exists
-      const exists = messages.value.some(m => m.id === message.id)
+      const exists = messages.value.some(m => m.id === normalizedMessage.id)
       if (!exists) {
-        messages.value.push(message)
+        messages.value.push(normalizedMessage)
         console.log('Added new message from Socket.io')
         nextTick(() => scrollToBottom())
       } else {
@@ -306,11 +318,10 @@ const fetchChatDetails = async () => {
     // Using POST request to get chat details with the user ID
     const { post } = useApi({
       url: `/messages/chats/${chatId.value}`,
-      auth: true,
-      body: {}
+      auth: true
     })
 
-    const response = await post() as { data: ChatResponse }
+    const response = await post({}) as { data: ChatResponse }
     const chatData = response.data
 
     chat.value = {
@@ -322,7 +333,17 @@ const fetchChatDetails = async () => {
     }
 
     if (chatData.messages && Array.isArray(chatData.messages)) {
-      messages.value = chatData.messages
+      // Normalize messages from API (API returns "content", we expect "text")
+      messages.value = chatData.messages.map((msg: any) => ({
+        id: msg.id,
+        text: msg.content || msg.text || msg.message || '',
+        sender_id: msg.sender_id,
+        recipient_id: msg.recipient_id,
+        address_id: msg.address_id,
+        is_read: msg.is_read || false,
+        created_at: msg.created_at,
+        updated_at: msg.updated_at
+      }))
       nextTick(() => scrollToBottom())
     }
   } catch (err) {
@@ -383,10 +404,22 @@ const sendMessage = async () => {
     if (response && response.data) {
       const savedMessage = response.data
 
+      // Normalize the saved message (API returns "content", we expect "text")
+      const normalizedMessage: Message = {
+        id: savedMessage.id,
+        text: savedMessage.content || savedMessage.text || savedMessage.message || '',
+        sender_id: savedMessage.sender_id,
+        recipient_id: savedMessage.recipient_id,
+        address_id: savedMessage.address_id,
+        is_read: savedMessage.is_read || false,
+        created_at: savedMessage.created_at,
+        updated_at: savedMessage.updated_at
+      }
+
       // Check if message already exists (deduplication)
-      const exists = messages.value.some(m => m.id === savedMessage.id)
+      const exists = messages.value.some(m => m.id === normalizedMessage.id)
       if (!exists) {
-        messages.value.push(savedMessage)
+        messages.value.push(normalizedMessage)
         console.log('Added sent message to local UI')
       }
     }
