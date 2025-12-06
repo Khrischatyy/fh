@@ -1,7 +1,7 @@
 """Device models for studio device management and blocking."""
 
 from datetime import datetime as datetime_type
-from sqlalchemy import String, Integer, ForeignKey, Boolean, DateTime, Text
+from sqlalchemy import String, Integer, ForeignKey, Boolean, DateTime, Text, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database import Base
 from src.models import IDMixin, TimestampMixin
@@ -48,6 +48,7 @@ class Device(Base, IDMixin, TimestampMixin):
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="devices")
     bookings: Mapped[list["Booking"]] = relationship("Booking", back_populates="device")
+    unlock_sessions: Mapped[list["DeviceUnlockSession"]] = relationship("DeviceUnlockSession", back_populates="device")
 
 
 class DeviceLog(Base, IDMixin, TimestampMixin):
@@ -62,3 +63,37 @@ class DeviceLog(Base, IDMixin, TimestampMixin):
 
     # Relationships
     device: Mapped["Device"] = relationship("Device")
+
+
+class DeviceUnlockSession(Base, IDMixin, TimestampMixin):
+    """
+    Device unlock session for temporary paid unlocks.
+
+    When a user pays to temporarily unlock a device, this tracks the session.
+    """
+
+    __tablename__ = "device_unlock_sessions"
+
+    # Device reference
+    device_id: Mapped[int] = mapped_column(Integer, ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Stripe payment details
+    stripe_session_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    stripe_payment_intent: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+
+    # Payment amount
+    amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="USD")
+
+    # Session status
+    status: Mapped[str] = mapped_column(String(50), nullable=False, server_default="pending", index=True)  # pending, paid, expired, cancelled
+
+    # Unlock duration
+    unlock_duration_hours: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+
+    # Timestamps
+    paid_at: Mapped[datetime_type | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime_type | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+
+    # Relationships
+    device: Mapped["Device"] = relationship("Device", back_populates="unlock_sessions")
