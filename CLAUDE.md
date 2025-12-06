@@ -182,7 +182,7 @@ The platform implements sophisticated studio visibility rules to ensure only pro
 
 A studio is considered "complete" and ready for public visibility when ALL of the following are met:
 
-1. **Operating Hours Configured**
+1. **Operating Hours Configured** 
    - At least one operating hours record exists
    - Can be Mode 1 (24/7), Mode 2 (Fixed), or Mode 3 (Variable)
 
