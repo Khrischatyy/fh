@@ -3,6 +3,8 @@ SQLAdmin Model Views.
 Defines admin views for all database models.
 """
 from sqladmin import ModelView
+from wtforms import StringField, PasswordField
+from wtforms.validators import Optional as WTFOptional, Length
 from src.auth.models import User, EngineerRate, PasswordResetToken
 from src.addresses.models import (
     Address,
@@ -518,7 +520,7 @@ class DeviceAdmin(ModelView, model=Device):
 
     name = "Device"
     name_plural = "Devices"
-    icon = "fa-solid fa-desktop"
+    icon = "fa-solid fa-laptop"
     category = "Devices"
 
     column_list = [
@@ -529,22 +531,85 @@ class DeviceAdmin(ModelView, model=Device):
         Device.is_blocked,
         Device.is_active,
         Device.last_heartbeat,
-        Device.last_ip,
         Device.created_at,
     ]
     column_searchable_list = [Device.name, Device.mac_address, Device.device_uuid]
-    column_sortable_list = [Device.id, Device.name, Device.last_heartbeat, Device.created_at]
+    column_sortable_list = [Device.id, Device.name, Device.created_at, Device.last_heartbeat]
     column_filters = [Device.user_id, Device.is_blocked, Device.is_active]
 
-    # Allow deletion (cascading is handled by database)
-    can_delete = True
-
-    form_excluded_columns = [
+    column_details_list = [
+        Device.id,
+        Device.name,
+        Device.mac_address,
+        Device.device_uuid,
+        Device.user_id,
+        Device.is_blocked,
+        Device.is_active,
+        Device.password_changed_at,  # Show when password was changed
+        Device.last_heartbeat,
+        Device.last_ip,
+        Device.os_version,
+        Device.app_version,
+        Device.notes,
         Device.created_at,
         Device.updated_at,
-        Device.device_token,
-        Device.bookings,
     ]
+
+    # Allow editing these fields
+    form_columns = [
+        Device.name,
+        Device.mac_address,
+        Device.device_uuid,
+        Device.user_id,
+        Device.is_blocked,
+        Device.is_active,
+        Device.notes,
+    ]
+
+    # Add custom form fields
+    form_extra_fields = {
+        'new_password': PasswordField(
+            'Set New Password',
+            validators=[WTFOptional(), Length(min=6, max=255)],
+            description='Enter new macOS password for device (leave blank to keep current)',
+            render_kw={'placeholder': 'Enter new password...'}
+        )
+    }
+
+    async def on_model_change(self, data: dict, model: Device, is_created: bool) -> None:
+        """
+        Hook called before saving model changes.
+        Handle password encryption if new_password is provided.
+        """
+        from cryptography.fernet import Fernet
+        from src.config import settings
+        from datetime import datetime, timezone
+
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"on_model_change called with data keys: {data.keys()}")
+
+        # Check if new_password field was filled in
+        new_password = data.get('new_password', None)
+        logger.info(f"new_password value: {new_password}")
+
+        if new_password and new_password.strip():
+            logger.info("Encrypting password...")
+            # Encrypt the password
+            if settings.password_encryption_key:
+                fernet = Fernet(settings.password_encryption_key.encode())
+                encrypted = fernet.encrypt(new_password.encode())
+                data['current_password'] = encrypted.decode()
+                data['password_changed_at'] = datetime.now(timezone.utc)
+                logger.info("Password encrypted successfully")
+            else:
+                logger.error("No encryption key configured!")
+
+        # Remove new_password from data before saving
+        if 'new_password' in data:
+            data.pop('new_password')
+
+        await super().on_model_change(data, model, is_created)
 
 
 class DeviceLogAdmin(ModelView, model=DeviceLog):
@@ -552,7 +617,7 @@ class DeviceLogAdmin(ModelView, model=DeviceLog):
 
     name = "Device Log"
     name_plural = "Device Logs"
-    icon = "fa-solid fa-list-check"
+    icon = "fa-solid fa-clipboard-list"
     category = "Devices"
 
     column_list = [
@@ -562,9 +627,13 @@ class DeviceLogAdmin(ModelView, model=DeviceLog):
         DeviceLog.ip_address,
         DeviceLog.created_at,
     ]
-    column_searchable_list = [DeviceLog.action]
-    column_sortable_list = [DeviceLog.id, DeviceLog.created_at]
     column_filters = [DeviceLog.device_id, DeviceLog.action]
+    column_sortable_list = [DeviceLog.id, DeviceLog.created_at]
+
+    # Read-only
+    can_create = False
+    can_edit = False
+    can_delete = False
 
     form_excluded_columns = [
         DeviceLog.created_at,

@@ -18,8 +18,8 @@ from src.devices.schemas import (
     DeviceStatusResponse,
     DeviceHeartbeatRequest,
     DeviceUnlockRequest,
-    DevicePaymentLinkRequest,
-    DevicePaymentLinkResponse,
+    StorePasswordRequest,
+    DevicePasswordResponse,
 )
 from src.auth.schemas import DeviceRegisterWithTokenRequest
 from src.auth.service import auth_service
@@ -236,32 +236,57 @@ async def unlock_device_with_password(
     }
 
 
-@router.post("/payment-link", response_model=DevicePaymentLinkResponse)
-async def generate_payment_link(
-    payment_data: DevicePaymentLinkRequest,
+@router.post("/store-password", response_model=dict, status_code=status.HTTP_200_OK)
+async def store_device_password(
+    password_data: StorePasswordRequest,
     service: DeviceService = Depends(get_device_service),
 ):
     """
-    Generate a Stripe Checkout payment link for device unlock via Cash App.
+    Store device password (called by locker app after changing macOS password).
 
-    This endpoint is called by the macOS locker app when the device is locked.
-    The returned payment_url should be displayed as a QR code for the user to scan.
-
-    Payment is processed via Cash App ONLY. After successful payment:
-    - Stripe sends a webhook to /api/webhooks/stripe
-    - The device unlock session is marked as paid
-    - Device's next status check will return should_lock=false for 1 hour
-
-    No authentication required (uses device_uuid + device_token).
+    This endpoint stores the encrypted macOS user password in the backend
+    so studio owners can access it if needed. Uses device token for authentication.
     """
-    result = await service.generate_payment_link(
-        payment_data.device_uuid,
-        payment_data.device_token
-    )
+    success = await service.store_device_password(password_data)
 
-    return DevicePaymentLinkResponse(
-        payment_url=result['payment_url'],
-        session_id=result['session_id'],
-        amount=result['amount'],
-        expires_in_minutes=result['expires_in_minutes'],
+    return {
+        "success": success,
+        "message": "Password stored successfully",
+        "code": 200
+    }
+
+
+@router.get("/{device_id}/password", response_model=DevicePasswordResponse)
+async def get_device_password(
+    device_id: int,
+    current_user: User = Depends(get_current_user),
+    service: DeviceService = Depends(get_device_service),
+):
+    """
+    Get device password (studio owner only).
+
+    Returns the decrypted macOS user password for the device.
+    Only the device owner can access this endpoint.
+    """
+    password_response = await service.get_device_password(device_id, current_user.id)
+    return password_response
+
+
+@router.post("/get-password", response_model=DevicePasswordResponse)
+async def get_device_password_by_token(
+    request: DeviceHeartbeatRequest,
+    service: DeviceService = Depends(get_device_service),
+):
+    """
+    Get device password using device token (device-to-backend authentication).
+
+    This endpoint allows the locker app to fetch its current password from the backend
+    so it can sync the macOS user password with the admin panel setting.
+
+    Authentication: Uses device_uuid and device_token (not user JWT).
+    """
+    password_response = await service.get_device_password_by_token(
+        request.device_uuid,
+        request.device_token
     )
+    return password_response
