@@ -125,7 +125,7 @@ class MessageService:
         chat_summaries = []
         for row in chat_rows:
             customer_id, customer_name, address_id, address_name, \
-                last_message, last_message_time, message_id = row
+                last_message, last_message_time, message_id, customer_photo = row
 
             # Get unread count for this chat
             unread_count = await self._repository.count_unread_messages(
@@ -138,6 +138,7 @@ class MessageService:
                 id=message_id,  # Use last message ID as chat identifier
                 customer_id=customer_id,
                 customer_name=customer_name or "Unknown",
+                customer_photo=customer_photo,
                 address_id=address_id,
                 address_name=address_name or "Unknown Studio",
                 last_message=last_message,
@@ -244,6 +245,7 @@ class MessageService:
             id=id_param,
             customer_id=customer_id,
             customer_name=customer_name,
+            customer_photo=customer.profile_photo,
             address_id=resolved_address_id,
             address_name=address.name or "Unknown Studio",
             messages=[schemas.MessageResponse.model_validate(msg) for msg in messages]

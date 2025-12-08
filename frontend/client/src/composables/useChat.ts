@@ -51,6 +51,11 @@ export function useChat(options: UseChatOptions) {
    * Connect to Socket.io server
    */
   const connect = () => {
+    if (!process.client) {
+      console.log('[useChat] Skipping connection (SSR)')
+      return
+    }
+
     if (socket.value?.connected) {
       console.log('[useChat] Already connected')
       return
@@ -195,6 +200,8 @@ export function useChat(options: UseChatOptions) {
    * Scroll messages container to bottom
    */
   const scrollToBottom = () => {
+    if (!process.client) return
+
     nextTick(() => {
       // Try multiple selectors to find messages container
       const container =
@@ -225,15 +232,15 @@ export function useChat(options: UseChatOptions) {
     messages.value = []
   }
 
-  // Auto-connect if enabled
-  if (autoConnect && sessionStore.isAuthorized) {
+  // Auto-connect if enabled (client-only)
+  if (autoConnect && sessionStore.isAuthorized && process.client) {
     connect()
   }
 
   // Watch for authorization changes and auto-connect if needed
   if (autoConnect) {
     watch(() => sessionStore.isAuthorized, (isAuth) => {
-      if (isAuth && !socket.value?.connected) {
+      if (isAuth && !socket.value?.connected && process.client) {
         console.log('[useChat] Session authorized, connecting...')
         connect()
       } else if (!isAuth && socket.value?.connected) {

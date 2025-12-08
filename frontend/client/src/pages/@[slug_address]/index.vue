@@ -417,13 +417,15 @@
         :show-popup="showLoginPopup"
         @close-popup="closeLoginPopup"
     />
-    <ChatModal
-      v-if="showChatPopup && ((isOwner && selectedCustomerId) || (!isOwner && address?.company?.user_id))"
-      :showPopup="showChatPopup"
-      :studioId="address?.id"
-      :recipientId="isOwner ? selectedCustomerId : address?.company?.user_id"
-      @closePopup="showChatPopup = false"
-    />
+    <ClientOnly>
+      <ChatModal
+        v-if="showChatPopup && ((isOwner && selectedCustomerId) || (!isOwner && address?.company?.user_id))"
+        :showPopup="showChatPopup"
+        :studioId="address?.id"
+        :recipientId="isOwner ? selectedCustomerId : address?.company?.user_id"
+        @closePopup="showChatPopup = false"
+      />
+    </ClientOnly>
   </div>
 </template>
 <script setup lang="ts">
@@ -484,7 +486,11 @@ const route = useRoute()
 const addressSlug = ref(route.params.slug_address)
 const bookingError = ref("")
 const {address} = useAddress(addressSlug.value)
-const {tooltipData, showTooltip, hideTooltip} = inject("tooltipData")
+const {tooltipData, showTooltip, hideTooltip} = inject("tooltipData", {
+  tooltipData: ref(null),
+  showTooltip: () => {},
+  hideTooltip: () => {}
+})
 provide("address", address)
 
 const teammatesOptions = computed(() => {
@@ -654,7 +660,7 @@ useHead({
 const photoContainer = ref<HTMLElement | null>(null)
 
 const handleScroll = () => {
-  if (!photoContainer.value) return
+  if (!process.client || !photoContainer.value) return
   const maxHeight = 250 // Max height of the photo container
   const minHeight = 150 // Min height of the photo container
   const scrollThreshold = 0 // Scroll position at which the resizing effect should start
@@ -678,12 +684,19 @@ onBeforeMount(() => {
 })
 
 onMounted(async () => {
-  window.addEventListener("scroll", handleScroll)
-  window.addEventListener("message", handlePaymentStatus)
+  if (process.client) {
+    // Initialize PhotoSwipe on client side only
+    const { pswpElement: photoSwipeElement, openGallery: openPhotoGallery } = usePhotoSwipe()
+    pswpElement.value = photoSwipeElement.value
+    openGallery.value = openPhotoGallery
 
-  photoContainer.value?.addEventListener("animationend", () => {
-    mainContainer.value.style.overflow = "inherit"
-  })
+    window.addEventListener("scroll", handleScroll)
+    window.addEventListener("message", handlePaymentStatus)
+
+    photoContainer.value?.addEventListener("animationend", () => {
+      mainContainer.value.style.overflow = "inherit"
+    })
+  }
 })
 
 // Define isOwner computed property before using it
@@ -693,7 +706,7 @@ const customers = ref([])
 
 // Watch for address to load and fetch customers if owner
 watch(() => address.value, (newAddress) => {
-  if (newAddress && isOwner.value) {
+  if (newAddress && isOwner.value && process.client) {
     fetchCustomersForOwner()
   }
   // Auto-select first room with prices when address loads
@@ -729,11 +742,14 @@ async function fetchCustomersForOwner() {
 }
 
 onUnmounted(() => {
-  window.removeEventListener("scroll", handleScroll)
-  window.removeEventListener("message", handlePaymentStatus)
+  if (process.client) {
+    window.removeEventListener("scroll", handleScroll)
+    window.removeEventListener("message", handlePaymentStatus)
+  }
 })
 
 function handlePaymentStatus(event: MessageEvent) {
+  if (!process.client) return // SSR guard
   if (event.origin !== window.location.origin) return // Ensure the message is from the same origin
   if (event.data && event.data.status === "closed") {
     // Handle the status update here
@@ -931,8 +947,10 @@ function book() {
     end_date: rentingForm.value.end_time.date,
   }
 
-  // Store booking data in localStorage
-  localStorage.setItem("bookingData", JSON.stringify(bookingData))
+  // Store booking data in localStorage (client-only)
+  if (process.client) {
+    localStorage.setItem("bookingData", JSON.stringify(bookingData))
+  }
   if (!isAuthorized.value) {
     openLoginPopup()
     isLoading.value = false
@@ -943,19 +961,27 @@ function book() {
         responseQuote.value = response.data
         isLoading.value = false
         //Delete bookingData from local storage if success and redirect to payment
-        localStorage.removeItem("bookingData")
+        if (process.client) {
+          localStorage.removeItem("bookingData")
+        }
         if (response.data?.payment_url) {
-          window.location.href = response.data?.payment_url
+          if (process.client) {
+            window.location.href = response.data?.payment_url
+          }
         }
       })
       .catch((error) => {
-        localStorage.removeItem("bookingData")
+        if (process.client) {
+          localStorage.removeItem("bookingData")
+        }
         bookingError.value = error.errors.error
         isLoading.value = false
       })
 }
 
 function pay(url: string) {
+  if (!process.client) return
+
   const paymentWindow = window.open(
       url,
       "_blank",
@@ -998,7 +1024,10 @@ function timeChanged(newDate: string, input: keyof StudioFormValues) {
   rentingForm.value[input] = newDate
 }
 
-const {pswpElement, openGallery} = usePhotoSwipe()
+// Lazy-load PhotoSwipe only on client side
+const pswpElement = ref(null)
+const openGallery = ref(() => {})
+
 const displayedPhotos: SlideData[] = computed(() =>
     address?.value.photos.map((photo) => ({
       src: photo.path,

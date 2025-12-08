@@ -112,7 +112,7 @@ class MessageRepository:
 
         Returns:
             List of tuples: (customer_id, customer_name, address_id, address_name,
-                            last_message, last_message_time, message_id)
+                            last_message, last_message_time, message_id, customer_photo)
         """
         # Subquery to get last message per chat thread
         # A chat thread is identified by (address_id, customer_id)
@@ -150,7 +150,8 @@ class MessageRepository:
                 Address.name.label('address_name'),
                 Message.content.label('last_message'),
                 Message.created_at.label('last_message_time'),
-                Message.id.label('message_id')
+                Message.id.label('message_id'),
+                User.profile_photo.label('customer_photo')
             )
             .select_from(last_message_subq)
             .join(

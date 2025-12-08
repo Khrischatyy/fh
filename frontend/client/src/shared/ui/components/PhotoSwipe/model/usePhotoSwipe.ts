@@ -6,6 +6,11 @@ import PhotoSwipe from 'photoswipe';
 
 // Helper function to get image dimensions
 function getImageDimensions(url) {
+    // SSR guard - return default dimensions during server-side rendering
+    if (!process.client) {
+        return Promise.resolve({ width: 1200, height: 900 });
+    }
+
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
@@ -21,7 +26,8 @@ export function usePhotoSwipe() {
     let gallery: PhotoSwipe | null = null;
 
     const openGallery = async (items: SlideData[], index: number) => {
-        if (!pswpElement.value) return;
+        // SSR guard - prevent gallery from opening during server-side rendering
+        if (!process.client || !pswpElement.value) return;
 
         // Fetch dimensions for each photo
         const processedItems = await Promise.all(items.map(async (photo) => {

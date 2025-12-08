@@ -138,11 +138,11 @@ io.on('connection', async (socket) => {
                 senderId,
                 recipientId,
                 addressId,
-                message: savedMessage.content,
+                content: savedMessage.content,
                 createdAt: savedMessage.created_at
             };
-            // Only emit to recipient (sender already has the message from API response)
-            io.to(`user_${recipientId}`).emit('new-message', messageData);
+            // Emit to BOTH sender and recipient for reliable real-time updates
+            io.to(`user_${recipientId}`).to(`user_${senderId}`).emit('new-message', messageData);
         } catch (error) {
             console.error('[chat] Error saving message via API:', error?.response?.data || error.message);
             socket.emit('error', 'Failed to send message');
