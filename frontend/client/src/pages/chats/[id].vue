@@ -1,11 +1,5 @@
 <template>
-  <div>
-    <NuxtLayout
-      :title="chat?.customer_name || 'Chat'"
-      class="text-white flex flex-col min-h-screen"
-      name="dashboard"
-    >
-      <div class="container mx-auto px-2 md:px-4 h-full flex flex-col" style="height: calc(100vh - 100px);">
+  <div class="container mx-auto px-2 md:px-4 h-full flex flex-col" style="height: calc(100vh - 100px);">
         <!-- Header -->
         <div class="py-4 border-b border-gray-700 flex items-center justify-between">
           <div class="flex items-center space-x-3">
@@ -14,7 +8,10 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+            <div v-if="chat?.customer_photo" class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+              <img :src="chat.customer_photo" :alt="chat.customer_name" class="w-full h-full object-cover" />
+            </div>
+            <div v-else class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
               <span class="text-white font-semibold">{{ getInitials(chat?.customer_name || '') }}</span>
             </div>
             <div>
@@ -56,7 +53,7 @@
                 >
                   <span class="sender-label text-xs font-bold block mb-1" v-if="message.sender_id === currentUserId">You</span>
                   <span class="sender-label text-xs font-bold block mb-1" v-else>{{ chat?.customer_name || 'User' }}</span>
-                  <p class="text-sm">{{ message.content }}</p>
+                  <p class="text-sm">{{ message.text }}</p>
                 </div>
                 <p class="message-time text-xs mt-1 text-gray-400">
                   {{ formatTime(message.created_at) }}
@@ -87,8 +84,6 @@
           </form>
         </div>
       </div>
-    </NuxtLayout>
-  </div>
 </template>
 
 <style scoped>
@@ -165,13 +160,18 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { definePageMeta } from '#imports'
 import { useApi } from '~/src/lib/api'
 import { useSessionStore } from '~/src/entities/Session'
 import { io } from 'socket.io-client'
 
+definePageMeta({
+  layout: 'dashboard',
+})
+
 type Message = {
   id: number
-  content: string
+  text: string
   sender_id: number
   recipient_id: number
   address_id: number
@@ -183,6 +183,7 @@ type Message = {
 type ChatResponse = {
   id: string
   customer_name: string
+  customer_photo?: string
   address_name: string
   customer_id: string
   address_id: number
@@ -192,6 +193,7 @@ type ChatResponse = {
 type Chat = {
   id: number
   customer_name: string
+  customer_photo?: string
   address_name: string
   customer_id: number
   address_id: number
@@ -262,13 +264,25 @@ const connectSocket = () => {
       isConnected.value = false
     })
 
-    socket.value.on('new-message', (message: Message) => {
+    socket.value.on('new-message', (message: any) => {
       console.log('[chat][debug] new-message received:', message)
 
+      // Normalize field names (Socket.io sends "message", we expect "text")
+      const normalizedMessage: Message = {
+        id: message.id,
+        text: message.message || message.content || message.text || '',
+        sender_id: message.senderId || message.sender_id,
+        recipient_id: message.recipientId || message.recipient_id,
+        address_id: message.addressId || message.address_id,
+        is_read: message.is_read || false,
+        created_at: message.createdAt || message.created_at,
+        updated_at: message.updatedAt || message.updated_at || message.createdAt || message.created_at
+      }
+
       // Deduplicate: check if message already exists
-      const exists = messages.value.some(m => m.id === message.id)
+      const exists = messages.value.some(m => m.id === normalizedMessage.id)
       if (!exists) {
-        messages.value.push(message)
+        messages.value.push(normalizedMessage)
         console.log('Added new message from Socket.io')
         nextTick(() => scrollToBottom())
       } else {
@@ -276,9 +290,19 @@ const connectSocket = () => {
       }
     })
 
-    socket.value.on('message-history', (history: Message[]) => {
+    socket.value.on('message-history', (history: any[]) => {
       console.log('[chat][debug] message-history received:', history)
-      messages.value = history
+      // Normalize messages from Socket.io (API returns "content", we expect "text")
+      messages.value = (history || []).map((msg: any) => ({
+        id: msg.id,
+        text: msg.content || msg.text || msg.message || '',
+        sender_id: msg.sender_id,
+        recipient_id: msg.recipient_id,
+        address_id: msg.address_id,
+        is_read: msg.is_read || false,
+        created_at: msg.created_at,
+        updated_at: msg.updated_at
+      }))
       nextTick(() => scrollToBottom())
     })
 
@@ -306,23 +330,33 @@ const fetchChatDetails = async () => {
     // Using POST request to get chat details with the user ID
     const { post } = useApi({
       url: `/messages/chats/${chatId.value}`,
-      auth: true,
-      body: {}
+      auth: true
     })
 
-    const response = await post() as { data: ChatResponse }
+    const response = await post({}) as { data: ChatResponse }
     const chatData = response.data
 
     chat.value = {
       id: Number(chatData.id),
       customer_name: chatData.customer_name,
+      customer_photo: chatData.customer_photo,
       address_name: chatData.address_name,
       customer_id: Number(chatData.customer_id),
       address_id: chatData.address_id
     }
 
     if (chatData.messages && Array.isArray(chatData.messages)) {
-      messages.value = chatData.messages
+      // Normalize messages from API (API returns "content", we expect "text")
+      messages.value = chatData.messages.map((msg: any) => ({
+        id: msg.id,
+        text: msg.content || msg.text || msg.message || '',
+        sender_id: msg.sender_id,
+        recipient_id: msg.recipient_id,
+        address_id: msg.address_id,
+        is_read: msg.is_read || false,
+        created_at: msg.created_at,
+        updated_at: msg.updated_at
+      }))
       nextTick(() => scrollToBottom())
     }
   } catch (err) {
@@ -358,44 +392,64 @@ const sendMessage = async () => {
   if (!newMessage.value.trim() || isSending.value || !chat.value) return
 
   isSending.value = true
+  const messageText = newMessage.value.trim()
+  newMessage.value = '' // Clear input immediately
 
   try {
-    // First try to send via API directly
-    const { post } = useApi({
-      url: '/messages',
-      auth: true
-    })
+    if (!socket.value || !socket.value.connected) {
+      // Fallback to API if Socket.io is not connected
+      console.log('[chat] Socket.io not connected, using API fallback')
+      const { post } = useApi({
+        url: '/messages',
+        auth: true
+      })
 
-    const messageData = {
-      recipient_id: parseInt(String(chat.value.customer_id), 10),
-      content: newMessage.value.trim(),
-      address_id: parseInt(String(chat.value.address_id), 10)
-    }
-
-    console.log('Sending message data:', messageData)
-
-    // Send via API only (Socket.io server will broadcast to recipient)
-    const response = await post(messageData)
-    console.log('Message sent via API, response:', response)
-
-    // Add the sent message to local UI (optimistic update)
-    // Note: We'll also receive it via Socket.io broadcast, so we need deduplication
-    if (response && response.data) {
-      const savedMessage = response.data
-
-      // Check if message already exists (deduplication)
-      const exists = messages.value.some(m => m.id === savedMessage.id)
-      if (!exists) {
-        messages.value.push(savedMessage)
-        console.log('Added sent message to local UI')
+      const messageData = {
+        recipient_id: parseInt(String(chat.value.customer_id), 10),
+        content: messageText,
+        address_id: parseInt(String(chat.value.address_id), 10)
       }
+
+      const response = await post(messageData)
+      console.log('[chat] Message sent via API fallback:', response)
+
+      // Add to local UI since we won't get Socket.io broadcast
+      if (response && response.data) {
+        const savedMessage = response.data
+        const normalizedMessage: Message = {
+          id: savedMessage.id,
+          text: savedMessage.content || savedMessage.text || '',
+          sender_id: savedMessage.sender_id,
+          recipient_id: savedMessage.recipient_id,
+          address_id: savedMessage.address_id,
+          is_read: savedMessage.is_read || false,
+          created_at: savedMessage.created_at,
+          updated_at: savedMessage.updated_at
+        }
+
+        const exists = messages.value.some(m => m.id === normalizedMessage.id)
+        if (!exists) {
+          messages.value.push(normalizedMessage)
+        }
+      }
+    } else {
+      // Primary path: Send via Socket.io
+      console.log('[chat] Sending message via Socket.io')
+      socket.value.emit('private-message', {
+        recipientId: parseInt(String(chat.value.customer_id), 10),
+        addressId: parseInt(String(chat.value.address_id), 10),
+        message: messageText
+      })
+      console.log('[chat] Message emitted via Socket.io')
+      // Message will be added to UI when we receive 'new-message' event
     }
 
-    newMessage.value = ''
     nextTick(() => scrollToBottom())
   } catch (err) {
-    console.error('Error sending message:', err)
+    console.error('[chat] Error sending message:', err)
     error.value = 'Failed to send message'
+    // Restore message text if sending failed
+    newMessage.value = messageText
   } finally {
     isSending.value = false
   }

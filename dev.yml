@@ -176,8 +176,10 @@ services:
       - "6001:6001"
     environment:
       - NODE_ENV=development
+      - API_HOST=api:8000
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
       - DB_HOST=db
       - DB_DATABASE=book_studio
       - DB_USERNAME=postgres

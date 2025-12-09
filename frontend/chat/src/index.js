@@ -29,7 +29,8 @@ const io = new Server(server, {
 // Redis connection
 const redis = new Redis({
     host: process.env.REDIS_HOST || 'redis',
-    port: process.env.REDIS_PORT || 6379
+    port: process.env.REDIS_PORT || 6379,
+    password: process.env.REDIS_PASSWORD || undefined
 });
 
 // PostgreSQL connection
@@ -54,7 +55,8 @@ io.use(async (socket, next) => {
 
     try {
         console.log('[chat] Auth middleware - requesting /api/user/me ...');
-        const response = await axios.get('http://nginx/api/user/me', {
+        const apiHost = process.env.API_HOST || 'api:8000';
+        const response = await axios.get(`http://${apiHost}/api/user/me`, {
             headers: {
                 Authorization: `Bearer ${token}`,
                 Accept: 'application/json'
@@ -112,7 +114,8 @@ io.on('connection', async (socket) => {
         const senderId = socket.user.id;
         console.log('[chat] Incoming private-message:', { userId: senderId, data });
         try {
-            const apiUrl = 'http://nginx/api/messages';
+            const apiHost = process.env.API_HOST || 'api:8000';
+            const apiUrl = `http://${apiHost}/api/messages`;
             const apiData = {
                 recipient_id: recipientId,
                 address_id: addressId,
@@ -135,11 +138,11 @@ io.on('connection', async (socket) => {
                 senderId,
                 recipientId,
                 addressId,
-                message: savedMessage.content,
+                content: savedMessage.content,
                 createdAt: savedMessage.created_at
             };
-            // Only emit to recipient (sender already has the message from API response)
-            io.to(`user_${recipientId}`).emit('new-message', messageData);
+            // Emit to BOTH sender and recipient for reliable real-time updates
+            io.to(`user_${recipientId}`).to(`user_${senderId}`).emit('new-message', messageData);
         } catch (error) {
             console.error('[chat] Error saving message via API:', error?.response?.data || error.message);
             socket.emit('error', 'Failed to send message');
@@ -150,7 +153,8 @@ io.on('connection', async (socket) => {
     socket.on('get-message-history', async (data) => {
         const { addressId, recipientId } = data;
         try {
-            const apiUrl = 'http://nginx/api/messages/history';
+            const apiHost = process.env.API_HOST || 'api:8000';
+            const apiUrl = `http://${apiHost}/api/messages/history`;
             const apiHeaders = {
                 Accept: 'application/json',
                 Authorization: `Bearer ${socket.userToken}`
