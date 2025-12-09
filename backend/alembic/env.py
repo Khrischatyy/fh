@@ -28,6 +28,7 @@ from src.rooms.models import Room, RoomPhoto, RoomPrice
 from src.bookings.models import Booking, BookingStatus
 from src.payments.models import Charge, Payout, SquareLocation, SquareToken
 from src.messages.models import Message
+from src.devices.models import Device, DeviceLog
 
 # This is the Alembic Config object
 config = context.config

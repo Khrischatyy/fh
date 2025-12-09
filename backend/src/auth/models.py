@@ -124,6 +124,7 @@ class User(Base, IDMixin, TimestampMixin):
 
     # Status
     email_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Payment
     payment_gateway: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)

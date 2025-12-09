@@ -1,57 +1,81 @@
 """
-Basic HTTP Authentication for Admin Panel.
-Provides simple username/password authentication for SQLAdmin.
+SQLAdmin Authentication Backend.
+Provides email-based authentication with is_superuser check for SQLAdmin.
 """
-import secrets
 from typing import Optional
-from fastapi import Request
+from starlette.requests import Request
+from starlette.responses import RedirectResponse
 from sqladmin.authentication import AuthenticationBackend
-from src.config import settings
+from sqlalchemy import select
+from passlib.context import CryptContext
+
+from src.auth.models import User
+from src.database import SessionLocal
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-class BasicAuthBackend(AuthenticationBackend):
+class SuperuserAuthBackend(AuthenticationBackend):
     """
-    Basic HTTP Authentication backend for SQLAdmin.
-
-    Uses credentials from environment variables:
-    - ADMIN_USERNAME
-    - ADMIN_PASSWORD
+    Email-based authentication backend for SQLAdmin.
+    Only users with is_superuser=True can access the admin panel.
     """
 
     async def login(self, request: Request) -> bool:
         """
-        Authenticate user with username and password from form.
+        Authenticate user with email and password.
 
         Args:
-            request: FastAPI request object with form data
+            request: Starlette request object with form data
 
         Returns:
-            bool: True if authentication successful, False otherwise
+            bool: True if login successful, False otherwise
         """
         form = await request.form()
-        username = form.get("username")
-        password = form.get("password")
+        username = form.get("username", "")
+        password = form.get("password", "")
 
-        # Validate credentials
-        if (
-            username == settings.admin_username
-            and password == settings.admin_password
-        ):
-            # Store authentication token in session
-            request.session.update({"token": secrets.token_urlsafe(32)})
+        # Validate form data
+        if not username or len(username) < 3:
+            return False
+
+        # Query database for user
+        with SessionLocal() as db:
+            result = db.execute(
+                select(User).where(User.email == username)
+            )
+            user = result.scalar_one_or_none()
+
+            if not user:
+                return False
+
+            # Check if user is superuser
+            if not user.is_superuser:
+                return False
+
+            # Verify password
+            if not user.password_hash or not pwd_context.verify(password, user.password_hash):
+                return False
+
+            # Store authentication in session
+            request.session.update({
+                "admin_user_id": user.id,
+                "admin_user_email": user.email,
+                "admin_user_name": f"{user.firstname} {user.lastname}"
+            })
+
             return True
-
-        return False
 
     async def logout(self, request: Request) -> bool:
         """
         Log out user by clearing session.
 
         Args:
-            request: FastAPI request object
+            request: Starlette request object
 
         Returns:
-            bool: Always True
+            bool: True if logout successful
         """
         request.session.clear()
         return True
@@ -61,10 +85,23 @@ class BasicAuthBackend(AuthenticationBackend):
         Check if user is authenticated.
 
         Args:
-            request: FastAPI request object
+            request: Starlette request object
 
         Returns:
             bool: True if authenticated, False otherwise
         """
-        token = request.session.get("token")
-        return token is not None
+        user_id = request.session.get("admin_user_id")
+        if not user_id:
+            return False
+
+        # Verify user still exists and is still a superuser
+        with SessionLocal() as db:
+            result = db.execute(
+                select(User).where(User.id == user_id)
+            )
+            user = result.scalar_one_or_none()
+
+            if user and user.is_superuser:
+                return True
+
+        return False
