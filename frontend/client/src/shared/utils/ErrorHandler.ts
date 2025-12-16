@@ -1,6 +1,7 @@
 import { navigateTo } from "nuxt/app"
 import { useCookie } from "#app"
 import { useToastStore } from "~/src/shared/stores/useToastStore"
+import { useSessionStore } from "~/src/entities/Session"
 
 interface ApiResponse {
   status: number
@@ -70,11 +71,10 @@ export class ErrorHandler {
     }
 
     if (status === 401) {
-      const { useSessionStore } = await import("~/src/entities/Session")
-      const sessionStore = useSessionStore()
-      sessionStore.setAuthorized(false)
-      sessionStore.setAccessToken(null)
       if (process.client) {
+        const sessionStore = useSessionStore()
+        sessionStore.setAuthorized(false)
+        sessionStore.setAccessToken(null)
         navigateTo("/login")
       }
       return Promise.resolve({ status, message: "Redirecting to login page" })

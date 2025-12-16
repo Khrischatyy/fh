@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, useSlots, watch } from "vue"
-import { IconUpload } from "~/src/shared/ui/common"
+import IconUpload from "~/src/shared/ui/common/Icon/IconUpload.vue"
 
 const props = withDefaults(
   defineProps<{

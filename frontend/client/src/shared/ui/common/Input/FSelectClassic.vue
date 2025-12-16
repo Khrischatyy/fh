@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { IconDown } from "~/src/shared/ui/common"
+import IconDown from "~/src/shared/ui/common/Icon/IconDown.vue"
 import { ref, watch } from "vue"
 
 const props = defineProps<{
