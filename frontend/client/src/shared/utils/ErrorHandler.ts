@@ -1,5 +1,6 @@
 import { navigateTo } from "nuxt/app"
 import { useCookie } from "#app"
+import { useToastStore } from "~/src/shared/stores/useToastStore"
 
 interface ApiResponse {
   status: number
@@ -43,16 +44,29 @@ export class ErrorHandler {
     // Define common error messages based on status codes
     const nativeMessages: Record<number, string> = {
       401: "Authorization error",
-      404: "Page not found",
-      422: "Validation error", // Specific message for validation errors
+      404: "Resource not found",
+      422: "Validation error",
       500: "Server error",
     }
 
-    if (status === 404) {
+    // Show toast for errors instead of redirecting (except 401)
+    const showErrorToast = (message: string) => {
       if (process.client) {
-        navigateTo("/404")
+        try {
+          const toastStore = useToastStore()
+          toastStore.error(message)
+        } catch (e) {
+          // Fallback if toast store not available
+          console.error("Toast error:", message)
+        }
       }
-      return Promise.reject({ status, message: "Redirecting to 404 page" })
+    }
+
+    if (status === 404) {
+      // Don't redirect to 404 page - show toast instead
+      const message = errorData?.message || nativeMessages[404]
+      showErrorToast(message)
+      return Promise.reject({ status, message })
     }
 
     if (status === 401) {
@@ -69,7 +83,10 @@ export class ErrorHandler {
     // Check for specific error messages from the server
     if (errorData) {
       if (errorData.errors) {
-        // Server provided specific field errors
+        // Server provided specific field errors - show first error in toast
+        const firstError = Object.values(errorData.errors)[0]
+        const errorMessage = Array.isArray(firstError) ? firstError[0] : firstError
+        showErrorToast(errorMessage || errorData.message)
         return Promise.reject({
           status: status,
           message: errorData.message,
@@ -77,6 +94,7 @@ export class ErrorHandler {
         })
       } else if (errorData.message) {
         // Server provided a general error message
+        showErrorToast(errorData.message)
         return Promise.reject({
           status: status,
           message: errorData.message,
@@ -85,7 +103,8 @@ export class ErrorHandler {
     }
 
     // Default error handling if no specific messages are found
-    const message = nativeMessages[status] || errorData
+    const message = nativeMessages[status] || "An unexpected error occurred"
+    showErrorToast(message)
     return Promise.reject({ status, message })
   }
 }
