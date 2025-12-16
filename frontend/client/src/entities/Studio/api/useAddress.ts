@@ -4,6 +4,7 @@ import { useApi } from "~/src/lib/api"
 import { useAsyncData } from "#app"
 import type { RouteParamValue } from "vue-router"
 import { navigateTo } from "nuxt/app"
+import { useToastStore } from "~/src/shared/stores/useToastStore"
 export type AddressResponse = {
   success: boolean
   data: AddressFull
@@ -90,8 +91,19 @@ export function useAddress(slug: string | RouteParamValue[]) {
   // Watch for errors and handle them
   watch(error, (newError) => {
     if (newError) {
-      if (newError.statusCode == 404) navigateTo("/404")
-      else navigateTo("/")
+      // Only redirect to 404 for actual "studio not found" errors
+      if (newError.statusCode == 404) {
+        navigateTo("/404")
+      } else {
+        // For other errors, show a toast instead of redirecting
+        try {
+          const toastStore = useToastStore()
+          const message = newError.message || "Failed to load studio"
+          toastStore.error(message)
+        } catch (e) {
+          console.error("Error loading studio:", newError)
+        }
+      }
     }
   })
 
