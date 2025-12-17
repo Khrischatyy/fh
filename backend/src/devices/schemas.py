@@ -41,6 +41,7 @@ class DeviceStatusResponse(BaseModel):
     is_blocked: bool
     message: str
     should_lock: bool
+    lockout_info: Optional[dict] = Field(None, description="Lockout screen info (studio name, payment URL, etc.)")
 
 
 class DeviceResponse(BaseModel):
@@ -116,3 +117,32 @@ class DevicePasswordResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CreateDevicePaymentSessionRequest(BaseModel):
+    """Request schema for creating device payment session."""
+
+    device_uuid: str = Field(..., description="Device UUID")
+    unlock_duration_hours: int = Field(..., ge=1, le=168, description="Number of hours to unlock device (1-168)")
+
+
+class CreateDevicePaymentSessionResponse(BaseModel):
+    """Response schema for device payment session creation."""
+
+    success: bool = True
+    session_id: str = Field(..., description="Stripe checkout session ID")
+    payment_url: str = Field(..., description="Stripe checkout URL")
+    amount: float = Field(..., description="Payment amount")
+    currency: str = Field(default="USD", description="Payment currency")
+    message: str = "Payment session created successfully"
+    code: int = 200
+
+
+class DevicePaymentSuccessResponse(BaseModel):
+    """Response schema for device payment success."""
+
+    success: bool
+    message: str
+    unlock_session_id: int
+    expires_at: datetime_type
+    code: int = 200

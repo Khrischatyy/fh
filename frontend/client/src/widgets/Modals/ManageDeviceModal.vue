@@ -207,7 +207,7 @@ watch(() => props.device, (newDevice) => {
         <!-- Device Info (Read-only) -->
         <div class="w-full bg-neutral-900 p-4 rounded-lg">
           <div class="flex flex-col gap-4 text-sm">
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 pb-4">
               <IconAddress class="opacity-20" />
               <div class="flex flex-col gap-0.5">
                 <span class="text-white opacity-20 text-xs">MAC Address</span>
@@ -215,7 +215,7 @@ watch(() => props.device, (newDevice) => {
               </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 pb-4">
               <IconClock class="opacity-20" />
               <div class="flex flex-col gap-0.5">
                 <span class="text-white opacity-20 text-xs">Last Seen</span>
@@ -223,7 +223,7 @@ watch(() => props.device, (newDevice) => {
               </div>
             </div>
 
-            <div v-if="device.os_version" class="flex items-center gap-2">
+            <div v-if="device.os_version" class="flex items-center gap-2 pb-4">
               <IconMonitor class="opacity-20" />
               <div class="flex flex-col gap-0.5">
                 <span class="text-white opacity-20 text-xs">OS Version</span>
@@ -231,7 +231,7 @@ watch(() => props.device, (newDevice) => {
               </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex items-center">
               <IconMonitor class="opacity-20" />
               <div class="flex flex-col gap-0.5">
                 <span class="text-white opacity-20 text-xs">Device UUID</span>
@@ -242,9 +242,9 @@ watch(() => props.device, (newDevice) => {
         </div>
 
         <!-- Editable Fields -->
-        <div class="w-full flex flex-col gap-4">
+        <div class="w-full flex flex-col ">
           <!-- Device Name -->
-          <div>
+          <div class="pl-4 pr-4">
             <label class="text-white opacity-20 text-sm font-normal tracking-wide">Device Name</label>
             <FInputClassic
               :wide="true"
@@ -255,46 +255,43 @@ watch(() => props.device, (newDevice) => {
           </div>
 
           <!-- Device Password -->
-          <div>
-            <label class="text-white opacity-20 text-sm font-normal tracking-wide">Device Password</label>
-            <div class="flex gap-2">
-              <div class="relative flex-1">
-                <FInputClassic
-                  :wide="true"
-                  :type="showPassword ? 'text' : 'password'"
-                  v-model="formData.current_password"
-                  placeholder="Enter or generate password"
-                  class="pr-20"
-                />
-                <button
-                  @click="showPassword = !showPassword"
-                  type="button"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-white opacity-40 hover:opacity-100 text-xs"
-                >
-                  {{ showPassword ? 'Hide' : 'Show' }}
-                </button>
-              </div>
-              <button
-                @click="generatePassword"
-                type="button"
-                class="px-4 py-2 bg-white bg-opacity-10 hover:bg-opacity-20 rounded-[10px] text-white text-sm font-medium tracking-wide whitespace-nowrap"
-              >
-                Generate
-              </button>
-              <button
-                v-if="formData.current_password"
-                @click="copyPassword"
-                type="button"
-                class="px-4 py-2 bg-white bg-opacity-10 hover:bg-opacity-20 rounded-[10px] text-white text-sm font-medium tracking-wide"
-                :class="passwordCopied ? 'bg-green-700' : ''"
-              >
-                {{ passwordCopied ? '✓' : 'Copy' }}
-              </button>
-            </div>
-            <p v-if="device.password_changed_at" class="text-white opacity-20 text-xs mt-1">
-              Last changed: {{ new Date(device.password_changed_at).toLocaleString() }}
-            </p>
-          </div>
+<!--          <div>-->
+<!--            <label class="text-white opacity-20 text-sm font-normal tracking-wide">Device Password</label>-->
+<!--            <div class="flex gap-2">-->
+<!--              <div class="relative flex-1">-->
+<!--                <FInputClassic-->
+<!--                  :wide="true"-->
+<!--                  :type="showPassword ? 'text' : 'password'"-->
+<!--                  v-model="formData.current_password"-->
+<!--                  placeholder="Enter or generate password"-->
+<!--                  class="pr-20"-->
+<!--                />-->
+<!--                <button-->
+<!--                  @click="showPassword = !showPassword"-->
+<!--                  type="button"-->
+<!--                  class="absolute right-3 top-1/2 -translate-y-1/2 text-white opacity-40 hover:opacity-100 text-xs"-->
+<!--                >-->
+<!--                  {{ showPassword ? 'Hide' : 'Show' }}-->
+<!--                </button>-->
+<!--              </div>-->
+<!--              <button-->
+<!--                @click="generatePassword"-->
+<!--                type="button"-->
+<!--                class="px-4 py-2 bg-white bg-opacity-10 hover:bg-opacity-20 rounded-[10px] text-white text-sm font-medium tracking-wide whitespace-nowrap"-->
+<!--              >-->
+<!--                Generate-->
+<!--              </button>-->
+<!--              <button-->
+<!--                v-if="formData.current_password"-->
+<!--                @click="copyPassword"-->
+<!--                type="button"-->
+<!--                class="px-4 py-2 bg-white bg-opacity-10 hover:bg-opacity-20 rounded-[10px] text-white text-sm font-medium tracking-wide"-->
+<!--                :class="passwordCopied ? 'bg-green-700' : ''"-->
+<!--              >-->
+<!--                {{ passwordCopied ? '✓' : 'Copy' }}-->
+<!--              </button>-->
+<!--            </div>-->
+<!--          </div>-->
         </div>
       </div>
     </template>

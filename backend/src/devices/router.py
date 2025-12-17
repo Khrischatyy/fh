@@ -20,6 +20,9 @@ from src.devices.schemas import (
     DeviceUnlockRequest,
     StorePasswordRequest,
     DevicePasswordResponse,
+    CreateDevicePaymentSessionRequest,
+    CreateDevicePaymentSessionResponse,
+    DevicePaymentSuccessResponse,
 )
 from src.auth.schemas import DeviceRegisterWithTokenRequest
 from src.auth.service import auth_service
@@ -290,3 +293,87 @@ async def get_device_password_by_token(
         request.device_token
     )
     return password_response
+
+
+@router.post("/create-payment-session", response_model=CreateDevicePaymentSessionResponse)
+async def create_device_payment_session(
+    request: CreateDevicePaymentSessionRequest,
+    service: DeviceService = Depends(get_device_service),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Create Stripe checkout session for device unlock payment.
+
+    This endpoint creates a payment session for temporarily unlocking a device.
+    Users can pay to unlock the device for a specified number of hours.
+
+    **Request Body:**
+    - **device_uuid**: Device UUID
+    - **unlock_duration_hours**: Number of hours to unlock (1-168)
+
+    **Returns:**
+    - **session_id**: Stripe checkout session ID
+    - **payment_url**: URL to Stripe checkout page
+    - **amount**: Payment amount in USD
+    """
+    try:
+        result = await service.create_device_payment_session(
+            device_uuid=request.device_uuid,
+            unlock_duration_hours=request.unlock_duration_hours
+        )
+
+        await db.commit()
+
+        return CreateDevicePaymentSessionResponse(
+            session_id=result['session_id'],
+            payment_url=result['payment_url'],
+            amount=result['amount'],
+            currency=result['currency']
+        )
+
+    except Exception as e:
+        await db.rollback()
+        raise
+
+
+@router.get("/payment-success", response_model=DevicePaymentSuccessResponse)
+async def device_payment_success(
+    session_id: str,
+    device_uuid: str,
+    service: DeviceService = Depends(get_device_service),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Process successful device payment.
+
+    Called by frontend after successful Stripe checkout.
+    Updates unlock session status and sets expiration time.
+
+    **Query Parameters:**
+    - **session_id**: Stripe checkout session ID
+    - **device_uuid**: Device UUID
+
+    **Returns:**
+    - **success**: Payment processing status
+    - **message**: Status message
+    - **unlock_session_id**: Unlock session ID
+    - **expires_at**: Device unlock expiration time
+    """
+    try:
+        result = await service.process_device_payment_success(
+            session_id=session_id,
+            device_uuid=device_uuid
+        )
+
+        await db.commit()
+
+        return DevicePaymentSuccessResponse(
+            success=result['success'],
+            message=result['message'],
+            unlock_session_id=result['unlock_session_id'],
+            expires_at=result['expires_at']
+        )
+
+    except Exception as e:
+        await db.rollback()
+        raise

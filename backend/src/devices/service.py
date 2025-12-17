@@ -275,7 +275,18 @@ class DeviceService:
         Raises:
             UnauthorizedException: If device not found or token invalid
         """
-        device = await self.repository.get_device_by_uuid(device_uuid)
+        # Load device with user relationship to get company name
+        from sqlalchemy import select
+        from sqlalchemy.orm import selectinload
+        from src.companies.models import AdminCompany, Company
+
+        stmt = (
+            select(Device)
+            .where(Device.device_uuid == device_uuid)
+            .options(selectinload(Device.user))
+        )
+        result = await self.repository.db.execute(stmt)
+        device = result.scalar_one_or_none()
 
         if not device:
             raise UnauthorizedException("Device not found")
@@ -285,6 +296,19 @@ class DeviceService:
 
         if not device.is_active:
             raise UnauthorizedException("Device is deactivated")
+
+        # Get studio/company name from user's admin companies
+        company_name = device.name  # Default to device name
+        if device.user:
+            stmt_company = (
+                select(Company)
+                .join(AdminCompany, AdminCompany.company_id == Company.id)
+                .where(AdminCompany.admin_id == device.user_id)
+            )
+            result_company = await self.repository.db.execute(stmt_company)
+            company = result_company.scalar_one_or_none()
+            if company:
+                company_name = company.name
 
         # Update heartbeat
         await self.repository.update_device_heartbeat(device.id, ip_address)
@@ -299,10 +323,21 @@ class DeviceService:
 
         # Check if manually blocked by admin
         if device.is_blocked:
+            # Build lockout info for locked devices
+            # Use frontend_url_for_qr for QR codes (supports local IP for mobile testing)
+            lockout_info = {
+                "studio_name": company_name,
+                "device_uuid": device.device_uuid,
+                "hourly_rate": 25.00,  # TODO: Get from device/studio settings
+                "booking_url": f"{settings.frontend_url_for_qr}/device-payment?device_uuid={device.device_uuid}&device_name={device.name}",
+                "currency": "USD"
+            }
+
             return DeviceStatusResponse(
                 is_blocked=True,
                 should_lock=True,
-                message="Device is blocked by studio owner"
+                message="Device is blocked by studio owner",
+                lockout_info=lockout_info
             )
 
         # Check for active bookings
@@ -339,10 +374,21 @@ class DeviceService:
             )
         else:
             # Device has bookings but outside booking time - should lock
+            # Build lockout info for payment page
+            # Use frontend_url_for_qr for QR codes (supports local IP for mobile testing)
+            lockout_info = {
+                "studio_name": company_name,
+                "device_uuid": device.device_uuid,
+                "hourly_rate": 25.00,  # TODO: Get from device/studio settings
+                "booking_url": f"{settings.frontend_url_for_qr}/device-payment?device_uuid={device.device_uuid}&device_name={device.name}",
+                "currency": "USD"
+            }
+
             return DeviceStatusResponse(
                 is_blocked=False,
                 should_lock=True,
-                message="No active booking - device should be locked"
+                message="No active booking - device should be locked",
+                lockout_info=lockout_info
             )
 
     async def unlock_device_with_password(self, device_uuid: str, password: str) -> bool:
@@ -495,3 +541,157 @@ class DeviceService:
             password_changed_at=device.password_changed_at,
             device_name=device.name
         )
+
+    async def create_device_payment_session(
+        self,
+        device_uuid: str,
+        unlock_duration_hours: int
+    ) -> dict:
+        """
+        Create Stripe checkout session for device unlock payment.
+
+        Args:
+            device_uuid: Device UUID
+            unlock_duration_hours: Number of hours to unlock
+
+        Returns:
+            Dict with session_id, payment_url, and amount
+
+        Raises:
+            NotFoundException: If device not found
+        """
+        import stripe
+        from datetime import timedelta
+        from src.devices.models import DeviceUnlockSession
+
+        device = await self.repository.get_device_by_uuid(device_uuid)
+
+        if not device:
+            raise NotFoundException("Device not found")
+
+        # Get device owner (studio owner)
+        from src.auth.repository import UserRepository
+        user_repo = UserRepository(self.repository.db)
+        studio_owner = await user_repo.get_user_by_id(device.user_id)
+
+        if not studio_owner or not studio_owner.stripe_account_id:
+            raise NotFoundException("Studio owner not found or Stripe account not configured")
+
+        # Calculate amount (hourly rate from studio owner settings or default)
+        hourly_rate = 25.00  # Default hourly rate in USD
+        # TODO: Get hourly rate from studio/device settings
+        total_amount = hourly_rate * unlock_duration_hours
+        amount_cents = int(total_amount * 100)
+
+        # Calculate service fee (4%)
+        service_fee_cents = int(amount_cents * 0.04)
+
+        # Create Stripe checkout session
+        stripe.api_key = settings.stripe_api_key
+        session = stripe.checkout.Session.create(
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f'Device Time Payment - {device.name}',
+                        'description': f'{unlock_duration_hours} hour(s) unlock',
+                    },
+                    'unit_amount': amount_cents,
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=f"{settings.frontend_url}/device-payment-success?session_id={{CHECKOUT_SESSION_ID}}&device_uuid={device_uuid}",
+            cancel_url=f"{settings.frontend_url}/device/{device_uuid}",
+            payment_intent_data={
+                'application_fee_amount': service_fee_cents,
+                'transfer_data': {
+                    'destination': studio_owner.stripe_account_id,
+                },
+            },
+            metadata={
+                'device_uuid': device_uuid,
+                'device_id': str(device.id),
+                'unlock_duration_hours': str(unlock_duration_hours),
+            },
+            expires_at=int((datetime.now() + timedelta(minutes=30)).timestamp()),
+        )
+
+        # Create unlock session record
+        unlock_session = DeviceUnlockSession(
+            device_id=device.id,
+            stripe_session_id=session.id,
+            amount=total_amount,
+            currency='USD',
+            status='pending',
+            unlock_duration_hours=unlock_duration_hours,
+        )
+
+        self.repository.db.add(unlock_session)
+        await self.repository.db.flush()
+
+        return {
+            'session_id': session.id,
+            'payment_url': session.url,
+            'amount': total_amount,
+            'currency': 'USD',
+            'unlock_session_id': unlock_session.id
+        }
+
+    async def process_device_payment_success(
+        self,
+        session_id: str,
+        device_uuid: str
+    ) -> dict:
+        """
+        Process successful device unlock payment.
+
+        Args:
+            session_id: Stripe checkout session ID
+            device_uuid: Device UUID
+
+        Returns:
+            Dict with success status and expiration time
+
+        Raises:
+            NotFoundException: If unlock session not found
+        """
+        import stripe
+        from datetime import timedelta
+        from sqlalchemy import select
+        from src.devices.models import DeviceUnlockSession
+
+        # Get unlock session
+        stmt = select(DeviceUnlockSession).where(
+            DeviceUnlockSession.stripe_session_id == session_id
+        )
+        result = await self.repository.db.execute(stmt)
+        unlock_session = result.scalar_one_or_none()
+
+        if not unlock_session:
+            raise NotFoundException("Unlock session not found")
+
+        # Verify with Stripe
+        stripe.api_key = settings.stripe_api_key
+        stripe_session = stripe.checkout.Session.retrieve(session_id)
+
+        if stripe_session.payment_status != 'paid':
+            return {
+                'success': False,
+                'message': 'Payment not completed',
+            }
+
+        # Update unlock session
+        unlock_session.status = 'paid'
+        unlock_session.paid_at = datetime.now()
+        unlock_session.expires_at = datetime.now() + timedelta(hours=unlock_session.unlock_duration_hours)
+        unlock_session.stripe_payment_intent = stripe_session.payment_intent
+
+        await self.repository.db.flush()
+
+        return {
+            'success': True,
+            'message': 'Device unlocked successfully',
+            'unlock_session_id': unlock_session.id,
+            'expires_at': unlock_session.expires_at
+        }
