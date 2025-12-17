@@ -3,7 +3,9 @@ Address/Studio utility functions.
 Contains reusable business logic for studio completion and visibility checks.
 """
 from typing import Optional, TYPE_CHECKING
+import asyncio
 import stripe
+from redis.asyncio import Redis
 from src.config import settings
 
 if TYPE_CHECKING:
@@ -14,8 +16,12 @@ if TYPE_CHECKING:
 # Initialize Stripe
 stripe.api_key = settings.stripe_api_key
 
+# Stripe cache constants
+STRIPE_CACHE_PREFIX = "stripe_payouts"
+STRIPE_CACHE_TTL = 3600  # 1 hour
 
-def is_studio_complete(address: "Address") -> bool:
+
+async def is_studio_complete(address: "Address", redis: Optional[Redis] = None) -> bool:
     """
     Determine if a studio has completed all required setup steps.
 
@@ -25,6 +31,7 @@ def is_studio_complete(address: "Address") -> bool:
 
     Args:
         address: The Address/studio to check
+        redis: Optional Redis client for caching
 
     Returns:
         True if studio setup is complete, False otherwise
@@ -35,14 +42,17 @@ def is_studio_complete(address: "Address") -> bool:
         return False
 
     # Check payment gateway
-    has_payment_gateway = has_payment_gateway_connected(address)
+    has_payment_gateway = await async_has_payment_gateway_connected(address, redis)
 
     return has_operating_hours and has_payment_gateway
 
 
 def has_payment_gateway_connected(address: "Address") -> bool:
     """
-    Check if studio owner has a payment gateway properly configured.
+    Check if studio owner has a payment gateway properly configured (SYNCHRONOUS - DEPRECATED).
+
+    NOTE: This is the old synchronous version kept for backward compatibility.
+    Use async_has_payment_gateway_connected() for new code.
 
     For Stripe: Account must exist AND have payouts enabled
     For Square: Just needs to be configured
@@ -83,6 +93,42 @@ def has_payment_gateway_connected(address: "Address") -> bool:
     return False
 
 
+async def async_has_payment_gateway_connected(
+    address: "Address", redis: Optional[Redis] = None
+) -> bool:
+    """
+    Check if studio owner has a payment gateway properly configured (ASYNC).
+
+    For Stripe: Account must exist AND have payouts enabled (checked via async API call)
+    For Square: Just needs to be configured
+
+    Args:
+        address: The Address/studio to check
+        redis: Optional Redis client for caching
+
+    Returns:
+        True if payment gateway is properly configured
+    """
+    if not address.company or not address.company.admin_companies:
+        return False
+
+    # Get the studio owner (admin)
+    studio_owner = get_studio_owner(address)
+    if not studio_owner:
+        return False
+
+    # Check Stripe
+    if studio_owner.stripe_account_id:
+        # Must verify that Stripe payouts are enabled (async)
+        return await async_check_stripe_payouts_enabled(studio_owner.stripe_account_id, redis)
+
+    # Check Square (if configured, assume it's ready)
+    if studio_owner.payment_gateway == 'square':
+        return True
+
+    return False
+
+
 def get_studio_owner(address: "Address") -> Optional["User"]:
     """
     Get the studio owner (admin user) for an address.
@@ -105,7 +151,10 @@ def get_studio_owner(address: "Address") -> Optional["User"]:
 
 def check_stripe_payouts_enabled(stripe_account_id: str) -> bool:
     """
-    Check if a Stripe account has payouts enabled.
+    Check if a Stripe account has payouts enabled (SYNCHRONOUS - DEPRECATED).
+
+    NOTE: This is the old synchronous version kept for backward compatibility.
+    Use async_check_stripe_payouts_enabled() for new code.
 
     Args:
         stripe_account_id: Stripe Connect account ID
@@ -118,6 +167,63 @@ def check_stripe_payouts_enabled(stripe_account_id: str) -> bool:
         return account.payouts_enabled
     except Exception:
         return False
+
+
+async def async_check_stripe_payouts_enabled(
+    stripe_account_id: str, redis: Optional[Redis] = None
+) -> bool:
+    """
+    Check if a Stripe account has payouts enabled (ASYNC with caching).
+
+    Uses Stripe SDK's native async method with 3-second timeout.
+    Results are cached in Redis for 1 hour to avoid repeated API calls.
+
+    Args:
+        stripe_account_id: Stripe Connect account ID
+        redis: Optional Redis client for caching
+
+    Returns:
+        True if payouts are enabled, False otherwise
+    """
+    # Check cache first if Redis is available
+    if redis:
+        cache_key = f"{STRIPE_CACHE_PREFIX}:{stripe_account_id}"
+        try:
+            cached_value = await redis.get(cache_key)
+            if cached_value is not None:
+                return cached_value == "1"  # Redis stores as string
+        except Exception:
+            pass  # Continue without cache if Redis fails
+
+    # Make async request to Stripe API using native SDK method
+    try:
+        # Use Stripe SDK's native async method with timeout
+        async with asyncio.timeout(3):
+            account = await stripe.Account.retrieve_async(stripe_account_id)
+            payouts_enabled = account.payouts_enabled
+
+            # Cache result if Redis is available
+            if redis:
+                try:
+                    cache_key = f"{STRIPE_CACHE_PREFIX}:{stripe_account_id}"
+                    await redis.setex(
+                        cache_key,
+                        STRIPE_CACHE_TTL,
+                        "1" if payouts_enabled else "0",
+                    )
+                except Exception:
+                    pass  # Continue without caching if Redis fails
+
+            return payouts_enabled
+
+    except asyncio.TimeoutError:
+        pass  # Return False on timeout
+    except stripe.StripeError:
+        pass  # Return False on Stripe API error
+    except Exception:
+        pass  # Catch-all for any other errors
+
+    return False
 
 
 def _transform_photo_path(path: str) -> str:
@@ -141,14 +247,14 @@ def _transform_photo_path(path: str) -> str:
     return f"/api/photos/image/{path}"
 
 
-def build_studio_dict(
+async def build_studio_dict(
     address: "Address",
     include_is_complete: bool = True,
     include_payment_status: bool = False,
-    stripe_cache: Optional[dict] = None
+    redis: Optional[Redis] = None
 ) -> dict:
     """
-    Build a standardized dictionary representation of a studio/address.
+    Build a standardized dictionary representation of a studio/address (ASYNC).
 
     This ensures consistent structure across all API endpoints and reduces duplication.
 
@@ -156,15 +262,12 @@ def build_studio_dict(
         address: The Address model instance
         include_is_complete: Whether to include the is_complete field
         include_payment_status: Whether to include payouts_ready field
-        stripe_cache: Optional cache dict for Stripe account statuses {account_id: payouts_enabled}
+        redis: Optional Redis client for caching Stripe account statuses
 
     Returns:
         Dictionary with standardized studio data
     """
     from src.gcs_utils import get_public_url
-
-    if stripe_cache is None:
-        stripe_cache = {}
 
     # Build basic studio dict
     studio_dict = {
@@ -271,32 +374,32 @@ def build_studio_dict(
 
     # Add is_complete if requested
     if include_is_complete:
-        studio_dict["is_complete"] = _calculate_is_complete(address, stripe_cache)
+        studio_dict["is_complete"] = await _calculate_is_complete(address, redis)
 
     # Add payouts_ready if requested (used for filtering)
     if include_payment_status:
-        studio_dict["payouts_ready"] = _calculate_payouts_ready(address, stripe_cache)
+        studio_dict["payouts_ready"] = await _calculate_payouts_ready(address, redis)
 
     return studio_dict
 
 
-def _calculate_is_complete(address: "Address", stripe_cache: dict) -> bool:
+async def _calculate_is_complete(address: "Address", redis: Optional[Redis] = None) -> bool:
     """
-    Calculate is_complete field value.
+    Calculate is_complete field value (ASYNC).
 
     Studio is complete when:
     - Has operating hours set
     - Has payment gateway with payouts enabled
     """
     has_operating_hours = len(address.operating_hours) > 0
-    has_payment = _calculate_payouts_ready(address, stripe_cache)
+    has_payment = await _calculate_payouts_ready(address, redis)
 
     return has_operating_hours and has_payment
 
 
-def _calculate_payouts_ready(address: "Address", stripe_cache: dict) -> bool:
+async def _calculate_payouts_ready(address: "Address", redis: Optional[Redis] = None) -> bool:
     """
-    Calculate payouts_ready field value.
+    Calculate payouts_ready field value (ASYNC).
 
     Payouts are ready when:
     - Stripe account has payouts_enabled = True, OR
@@ -306,14 +409,9 @@ def _calculate_payouts_ready(address: "Address", stripe_cache: dict) -> bool:
     if not studio_owner:
         return False
 
-    # Check Stripe with caching
+    # Check Stripe with Redis caching
     if studio_owner.stripe_account_id:
-        if studio_owner.stripe_account_id in stripe_cache:
-            return stripe_cache[studio_owner.stripe_account_id]
-        else:
-            payouts_enabled = check_stripe_payouts_enabled(studio_owner.stripe_account_id)
-            stripe_cache[studio_owner.stripe_account_id] = payouts_enabled
-            return payouts_enabled
+        return await async_check_stripe_payouts_enabled(studio_owner.stripe_account_id, redis)
 
     # Check Square
     if studio_owner.payment_gateway == 'square':

@@ -63,6 +63,8 @@ services:
     command: gunicorn src.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout 120 --keep-alive 5
     expose:
       - "8000"
+    volumes:
+      - ./backend/src:/app/src:ro  # Mount source code for hot-reload
     env_file:
       - ./.env
     environment:
@@ -139,6 +141,8 @@ services:
       dockerfile: Dockerfile
     container_name: funny-how-celery-worker-prod
     command: celery -A src.tasks.celery_app worker --loglevel=info --concurrency=4 --max-tasks-per-child=100
+    volumes:
+      - ./backend/src:/app/src:ro  # Mount source code for hot-reload
     env_file:
       - ./.env
     environment:
@@ -166,6 +170,8 @@ services:
       dockerfile: Dockerfile
     container_name: funny-how-celery-beat-prod
     command: celery -A src.tasks.celery_app beat --loglevel=info
+    volumes:
+      - ./backend/src:/app/src:ro  # Mount source code for hot-reload
     env_file:
       - ./.env
     environment:

@@ -302,54 +302,69 @@ async def get_studio_by_slug(
     Raises:
         NotFoundException: If address not found
     """
+    import asyncio
     from src.addresses.repository import AddressRepository
     from src.addresses.utils import build_studio_dict
-    from src.database import AsyncSessionLocal
+    from src.database import AsyncSessionLocal, get_redis
     from src.exceptions import NotFoundException
 
-    async with AsyncSessionLocal() as session:
-        repository = AddressRepository(session)
-        address = await repository.find_by_slug_with_relations(address_slug)
+    try:
+        # Add 10-second timeout for the entire endpoint
+        async with asyncio.timeout(10):
+            async with AsyncSessionLocal() as session:
+                repository = AddressRepository(session)
+                address = await repository.find_by_slug_with_relations(address_slug)
 
-        if not address:
-            raise NotFoundException(f"Address with slug '{address_slug}' not found")
+                if not address:
+                    raise NotFoundException(f"Address with slug '{address_slug}' not found")
 
-        # Build standardized studio dict with is_complete calculation
-        stripe_cache = {}
-        addr_dict = build_studio_dict(
-            address,
-            include_is_complete=True,
-            include_payment_status=False,
-            stripe_cache=stripe_cache
-        )
+                # Get Redis client for Stripe caching
+                redis_client = None
+                try:
+                    async for redis in get_redis():
+                        redis_client = redis
+                        break
+                except Exception:
+                    pass  # Continue without Redis if unavailable
 
-        # Ensure latitude/longitude are strings for this endpoint (Laravel compatibility)
-        if addr_dict.get("latitude") is not None:
-            addr_dict["latitude"] = str(addr_dict["latitude"])
-        if addr_dict.get("longitude") is not None:
-            addr_dict["longitude"] = str(addr_dict["longitude"])
+                # Build standardized studio dict with is_complete calculation (ASYNC)
+                addr_dict = await build_studio_dict(
+                    address,
+                    include_is_complete=True,
+                    include_payment_status=False,
+                    redis=redis_client
+                )
 
-        # Add engineers data (team members)
-        engineers_list = []
-        for engineer in address.engineers:
-            engineers_list.append({
-                "id": engineer.id,
-                "name": engineer.name,
-                "firstname": engineer.firstname,
-                "lastname": engineer.lastname,
-                "username": engineer.username,
-                "email": engineer.email,
-                "phone": engineer.phone,
-                "profile_photo": engineer.profile_photo,
-                "role": engineer.role,
-                "engineer_rate": {
-                    "rate_per_hour": float(engineer.engineer_rate.rate_per_hour) if engineer.engineer_rate else None
-                } if engineer.engineer_rate else None,
-            })
+                # Ensure latitude/longitude are strings for this endpoint (Laravel compatibility)
+                if addr_dict.get("latitude") is not None:
+                    addr_dict["latitude"] = str(addr_dict["latitude"])
+                if addr_dict.get("longitude") is not None:
+                    addr_dict["longitude"] = str(addr_dict["longitude"])
 
-        addr_dict["engineers"] = engineers_list
+                # Add engineers data (team members)
+                engineers_list = []
+                for engineer in address.engineers:
+                    engineers_list.append({
+                        "id": engineer.id,
+                        "name": engineer.name,
+                        "firstname": engineer.firstname,
+                        "lastname": engineer.lastname,
+                        "username": engineer.username,
+                        "email": engineer.email,
+                        "phone": engineer.phone,
+                        "profile_photo": engineer.profile_photo,
+                        "role": engineer.role,
+                        "engineer_rate": {
+                            "rate_per_hour": float(engineer.engineer_rate.rate_per_hour) if engineer.engineer_rate else None
+                        } if engineer.engineer_rate else None,
+                    })
 
-        return addr_dict
+                addr_dict["engineers"] = engineers_list
+
+                return addr_dict
+
+    except asyncio.TimeoutError:
+        raise NotFoundException(f"Request timed out loading studio '{address_slug}'")
 
 
 # Laravel-compatible operating hours endpoints
