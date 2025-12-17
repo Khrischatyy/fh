@@ -594,7 +594,7 @@ const setSeoMeta = () => {
     twitterTitle: () => `${address.value?.company.name} - Funny How`,
     twitterDescription: () =>
         `Book a session at ${address.value.company.name} from $${address.value.prices[0]?.price_per_hour}/hour. Only at Funny-How.com`,
-    twitterImage: studioFirstPhoto.value,
+    twitterImage: () => studioFirstPhoto.value,
     twitterCard: "summary",
   })
 
@@ -1027,11 +1027,11 @@ const pswpElement = ref(null)
 const openGallery = ref(() => {})
 
 const displayedPhotos: SlideData[] = computed(() =>
-    address?.value.photos.map((photo) => ({
+    address?.value?.photos?.map((photo) => ({
       src: photo.path,
       w: photo.file?.width || 1200, // Default width if not specified
       h: photo.file?.height || 900, // Default height if not specified
-    })),
+    })) || [],
 )
 const mainContainer = ref<HTMLElement | null>(null)
 const showPopup = ref(false)
