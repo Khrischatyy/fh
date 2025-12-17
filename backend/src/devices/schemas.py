@@ -145,4 +145,6 @@ class DevicePaymentSuccessResponse(BaseModel):
     message: str
     unlock_session_id: int
     expires_at: datetime_type
+    device_name: Optional[str] = Field(None, description="Device name")
+    device_password: Optional[str] = Field(None, description="Decrypted device password")
     code: int = 200

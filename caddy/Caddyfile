@@ -4,8 +4,7 @@
 }
 
 # Local development - explicit localhost binding (HTTP only, no TLS)
-# Added 192.168.1.227 for mobile QR code testing
-http://localhost, http://127.0.0.1, http://0.0.0.0, http://192.168.1.227, :80 {
+http://localhost, http://127.0.0.1, http://0.0.0.0, :80 {
     # Enable logging
     log {
         output stdout

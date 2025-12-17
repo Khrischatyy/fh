@@ -75,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineEmits, ref } from "vue"
+import { defineEmits, ref, computed } from "vue"
 import { BrandingLogo } from "~/src/shared/ui/branding"
 import { IconBurger, IconUser } from "~/src/shared/ui/common"
 import { navigateTo } from "nuxt/app"
@@ -98,12 +98,20 @@ const props = withDefaults(
   },
 )
 const sideMenuArray = ref([])
-const session = useSessionStore()
-const { user } = storeToRefs(session)
+
+// Initialize session store on client-side only
+let session: any = null
+let user = ref(null)
+if (process.client) {
+  session = useSessionStore()
+  const refs = storeToRefs(session)
+  user = refs.user
+}
+
 const isAuth = useCookie(ACCESS_TOKEN_KEY).value
 const emit = defineEmits(["toggleSideMenu"])
 const navigateToProfile = () => {
-  if (isAuth && session.userRole === "studio_owner") {
+  if (isAuth && session?.userRole === "studio_owner") {
     navigateTo("/my-studios")
   } else {
     navigateTo("/profile")

@@ -324,12 +324,11 @@ class DeviceService:
         # Check if manually blocked by admin
         if device.is_blocked:
             # Build lockout info for locked devices
-            # Use frontend_url_for_qr for QR codes (supports local IP for mobile testing)
             lockout_info = {
                 "studio_name": company_name,
                 "device_uuid": device.device_uuid,
                 "hourly_rate": 25.00,  # TODO: Get from device/studio settings
-                "booking_url": f"{settings.frontend_url_for_qr}/device-payment?device_uuid={device.device_uuid}&device_name={device.name}",
+                "booking_url": f"{settings.frontend_url}/device-payment?device_uuid={device.device_uuid}&device_name={device.name}",
                 "currency": "USD"
             }
 
@@ -375,12 +374,11 @@ class DeviceService:
         else:
             # Device has bookings but outside booking time - should lock
             # Build lockout info for payment page
-            # Use frontend_url_for_qr for QR codes (supports local IP for mobile testing)
             lockout_info = {
                 "studio_name": company_name,
                 "device_uuid": device.device_uuid,
                 "hourly_rate": 25.00,  # TODO: Get from device/studio settings
-                "booking_url": f"{settings.frontend_url_for_qr}/device-payment?device_uuid={device.device_uuid}&device_name={device.name}",
+                "booking_url": f"{settings.frontend_url}/device-payment?device_uuid={device.device_uuid}&device_name={device.name}",
                 "currency": "USD"
             }
 
@@ -570,7 +568,7 @@ class DeviceService:
             raise NotFoundException("Device not found")
 
         # Get device owner (studio owner)
-        from src.auth.repository import UserRepository
+        from src.users.repository import UserRepository
         user_repo = UserRepository(self.repository.db)
         studio_owner = await user_repo.get_user_by_id(device.user_id)
 
@@ -689,9 +687,24 @@ class DeviceService:
 
         await self.repository.db.flush()
 
+        # Get device to fetch password
+        device = await self.repository.get_by_id(unlock_session.device_id)
+        if not device:
+            raise NotFoundException("Device not found")
+
+        # Decrypt password if available
+        decrypted_password = None
+        if device.current_password:
+            try:
+                decrypted_password = self._decrypt_password(device.current_password)
+            except Exception as e:
+                logger.error(f"Failed to decrypt device password: {e}")
+
         return {
             'success': True,
             'message': 'Device unlocked successfully',
             'unlock_session_id': unlock_session.id,
-            'expires_at': unlock_session.expires_at
+            'expires_at': unlock_session.expires_at,
+            'device_name': device.name,
+            'device_password': decrypted_password
         }

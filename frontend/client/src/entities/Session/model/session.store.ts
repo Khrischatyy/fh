@@ -18,14 +18,15 @@ export const useSessionStore = defineStore({
   id: "session-store",
   state: () => ({
     userObject: null,
-    userInfo: useCookie(USER_INFO_KEY).value,
-    userRole: useCookie(USER_ROLE_KEY).value as UserRole | null,
-    accessToken: useCookie(ACCESS_TOKEN_KEY).value,
+    userInfo: null,
+    userRole: null as UserRole | null,
+    accessToken: null,
     isAuthorized: false,
     isLoading: false,
-    reservations: useCookie(RESERVES_KEY).value,
-    payment_session: useCookie(PAYMENT_SESSION).value,
-    brand: useCookie(BRAND_KEY).value,
+    reservations: null,
+    payment_session: null,
+    brand: null,
+    _hydrated: false,
   }),
   getters: {
     user(): any {
@@ -36,6 +37,21 @@ export const useSessionStore = defineStore({
     },
   },
   actions: {
+    hydrate() {
+      if (this._hydrated) return
+      this._hydrated = true
+
+      // Only hydrate on client-side
+      if (process.client) {
+        // Safely load from cookies
+        this.userInfo = useCookie(USER_INFO_KEY).value
+        this.userRole = useCookie(USER_ROLE_KEY).value as UserRole | null
+        this.accessToken = useCookie(ACCESS_TOKEN_KEY).value
+        this.reservations = useCookie(RESERVES_KEY).value
+        this.payment_session = useCookie(PAYMENT_SESSION).value
+        this.brand = useCookie(BRAND_KEY).value
+      }
+    },
     async fetchUserInfo() {
       if (!this.accessToken) {
         return

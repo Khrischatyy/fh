@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useHead } from "@unhead/vue"
-import { ref, onMounted, watch } from "vue"
+import { ref, onMounted, computed } from "vue"
 import { ACCESS_TOKEN_KEY, useSessionStore } from "~/src/entities/Session"
 import { useCookie } from "#app"
 import GoogleSignInButton from "~/src/shared/ui/components/GoogleSignInButton.vue"
@@ -14,22 +14,27 @@ useHead({
 })
 
 const isBrand = ref("")
-const session = useSessionStore()
 const showPhoneAuth = ref(false)
+const accessToken = useCookie(ACCESS_TOKEN_KEY)
+const isAuthenticated = computed(() => !!accessToken.value)
 
-watch(
-  () => session.brand,
-  (newValue) => {
-    isBrand.value = <string>newValue
-  },
-)
+// Initialize session store on client-side only
+let session: any = null
+if (process.client) {
+  session = useSessionStore()
+}
 
 onMounted(() => {
-  isBrand.value = <string>session.brand
+  if (session) {
+    session.hydrate()
+    isBrand.value = <string>session.brand
+  }
 })
 
 function signOut() {
-  useSessionStore().logout()
+  if (session) {
+    session.logout()
+  }
 }
 
 function handlePhoneAuthSuccess() {
@@ -83,7 +88,7 @@ function handlePhoneAuthCancel() {
       </div>
 
       <!-- Auth Buttons (shown when not authenticated) -->
-      <div v-if="!useCookie(ACCESS_TOKEN_KEY).value" class="flex flex-col items-center gap-3 mt-10">
+      <div v-if="!isAuthenticated" class="flex flex-col items-center gap-3 mt-10">
         <GoogleSignInButton />
 
         <!-- Phone Sign In Button (toggles inline form) -->
@@ -102,7 +107,7 @@ function handlePhoneAuthCancel() {
       </div>
 
       <div
-        v-if="useCookie(ACCESS_TOKEN_KEY).value"
+        v-if="isAuthenticated"
         class="justify-center w-full max-w-96 p-5 items-center gap-2.5 inline-flex mt-10"
       ></div>
     </div>
