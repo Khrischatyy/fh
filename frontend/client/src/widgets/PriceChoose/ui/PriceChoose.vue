@@ -94,16 +94,15 @@ function sendPrice(price) {
 
   post(price)
     .then((response) => {
-      response.data.forEach((price, index) => {
-        const newOrUpdatePrice = prices.value.find(
-          (p) => p.hours === price.hours,
-        )
-        if (newOrUpdatePrice) {
-          newOrUpdatePrice.id = price.id
-        } else {
-          prices.value.push(price)
-        }
-      })
+      const returnedPrice = response.data
+      const newOrUpdatePrice = prices.value.find(
+        (p) => p.hours === returnedPrice.hours,
+      )
+      if (newOrUpdatePrice) {
+        newOrUpdatePrice.id = returnedPrice.id
+      } else {
+        prices.value.push(returnedPrice)
+      }
       isLoading.value = false
       emit("update-studios")
     })
@@ -115,7 +114,7 @@ function sendPrice(price) {
 function deletePrice(price) {
   isLoading.value = true
   const { delete: callDeletePrice } = useApi({
-    url: `/room/prices?address_id=${props.room_id}&room_price_id=${price.id}&room_id=${props.room_id}`,
+    url: `/rooms/prices/${price.id}?room_id=${props.room_id}`,
     auth: true,
   })
 

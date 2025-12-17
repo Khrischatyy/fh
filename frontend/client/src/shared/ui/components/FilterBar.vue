@@ -262,6 +262,8 @@ const clearFilters = () => {
     rating: null,
     date: null,
     time: null,
+    city: null,
+    badges: null,
   }
 }
 onMounted(() => {

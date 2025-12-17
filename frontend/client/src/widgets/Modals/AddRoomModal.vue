@@ -19,6 +19,7 @@ import { AddStudioButton } from "~/src/features/addStudio"
 import { useApi } from "~/src/lib/api"
 import { ScrollContainer } from "~/src/shared/ui/common/ScrollContainer"
 import { usePhotoSwipe } from "~/src/shared/ui/components/PhotoSwipe"
+import IconTrash from "~/src/shared/ui/common/Icon/IconTrash.vue"
 import type { SlideData } from "photoswipe"
 import { navigateTo } from "#app"
 
@@ -166,6 +167,25 @@ const updatePhotos = () => {
       file: null,
     }))
     .sort((a, b) => a.index - b.index) // Sort photos by index
+}
+
+const deletePhoto = async (photo_id: number) => {
+  isLoading.value = true
+  const { delete: callDeletePhoto } = useApi({
+    url: `/rooms/photos/${photo_id}`,
+    auth: true,
+  })
+
+  try {
+    await callDeletePhoto()
+    // Remove photo from local array
+    studioForm.photos = studioForm.photos.filter(p => p.id !== photo_id)
+    emit("update-studios")
+  } catch (error) {
+    console.error("Failed to delete photo:", error)
+  } finally {
+    isLoading.value = false
+  }
 }
 
 const resetForm = () => {
@@ -366,7 +386,7 @@ const isReady = () => {
                     handleDragEnter($event, findRealIndexByUrl(photo.url))
                   "
                     @dragend="handleDragEnd"
-                    class="drag-item h-[237px] w-[full] bg-white shadow rounded-[10px] scrollElement no-margin"
+                    class="drag-item h-[237px] w-[full] bg-white shadow rounded-[10px] scrollElement no-margin relative group"
                 >
                   <img
                       :src="photo.url"
@@ -380,6 +400,14 @@ const isReady = () => {
                       alt="cover photo"
                       class="w-full h-full object-cover rounded-[10px]"
                   />
+                  <button
+                      v-if="photo.id"
+                      @click.stop="deletePhoto(photo.id)"
+                      class="absolute top-2 right-2 p-2 bg-red-500 hover:bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+                      title="Delete photo"
+                  >
+                    <IconTrash class="w-5 h-5 text-white" />
+                  </button>
                 </div>
             </div>
             <div
@@ -409,7 +437,7 @@ const isReady = () => {
                     handleDragEnter($event, findRealIndexByUrl(photo.url))
                   "
                   @dragend="handleDragEnd"
-                  class="drag-item h-[94px] w-[148px] bg-white shadow rounded-[10px] scrollElement no-margin"
+                  class="drag-item h-[94px] w-[148px] bg-white shadow rounded-[10px] scrollElement no-margin relative group"
                 >
                   <img
                     :src="photo.url"
@@ -423,6 +451,14 @@ const isReady = () => {
                     alt="cover photo"
                     class="w-full h-full object-cover rounded-[10px]"
                   />
+                  <button
+                      v-if="photo.id"
+                      @click.stop="deletePhoto(photo.id)"
+                      class="absolute top-1 right-1 p-1.5 bg-red-500 hover:bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+                      title="Delete photo"
+                  >
+                    <IconTrash class="w-4 h-4 text-white" />
+                  </button>
                 </div>
               </ScrollContainer>
             </div>

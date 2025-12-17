@@ -60,10 +60,7 @@
             {{ cityOptions.find((city) => city.id == selectedCity)?.name }}:
           </div>
           <div
-            v-if="
-              (selectedCountry || selectedCity || searchTerm) &&
-              cityOptions.length > 100000000000
-            "
+            v-if="selectedCountry || selectedCity || searchTerm"
             class="relative flex items-center cursor-pointer input border border-white border-double"
           >
             <button
@@ -139,6 +136,25 @@ type SimpleStudio = {
     logo: string
     slug: string
   }
+  badges: Array<{
+    id: number
+    name: string
+    image: string
+  }>
+  prices: Array<{
+    address_id: number
+    hours: string
+    id: number
+    is_enabled: boolean
+    price_per_hour: string
+    total_price: string
+  }>
+  rating?: number
+  stripe_account_id?: string
+  is_complete?: boolean
+  slug: string
+  operating_hours: Array<any>
+  company_slug?: string
 }
 
 const session = ref()
@@ -268,45 +284,59 @@ const handleCountryChange = async (countryId: string) => {
 }
 
 const handleCityChange = async (cityId: string) => {
-  selectedCity.value = cityId
-  localStorage.setItem("selectedCity", cityId.toString())
-  updateURL()
-  await fetchStudios(cityId)
+  try {
+    selectedCity.value = cityId
+    await fetchStudios(cityId)
+    // Only save to localStorage if fetch succeeds
+    localStorage.setItem("selectedCity", cityId.toString())
+    updateURL()
+  } catch (error) {
+    // Clear invalid city from localStorage
+    localStorage.removeItem("selectedCity")
+    selectedCity.value = null
+    studios.value = []
+    throw error
+  }
 }
 
 const fetchStudios = async (cityId: string) => {
-  const studiosData = await getStudios(cityId)
+  try {
+    const studiosData = await getStudios(cityId)
 
-  studios.value = studiosData.map((studio) => ({
-    id: studio.id,
-    logo: studio.company.logo_url,
-    company: studio.company,
-    name: studio.company.name,
-    street: studio.street,
-    photos: studio.photos,
-    stripe_account_id: studio.stripe_account_id,
-    badges: studio.badges,
-    prices: studio.prices,
-    is_complete: studio.is_complete,
-    slug: studio.slug,
-    operating_hours: studio.operating_hours,
-    company_slug: studio.company.slug,
-    price: studio.prices.length > 0 ? studio.prices[0].total_price : 0,
-  }))
+    studios.value = studiosData.map((studio) => ({
+      id: studio.id,
+      logo: studio.company.logo_url,
+      company: studio.company,
+      name: studio.company.name,
+      street: studio.street,
+      photos: studio.photos,
+      stripe_account_id: studio.stripe_account_id,
+      badges: studio.badges,
+      prices: studio.prices,
+      is_complete: studio.is_complete,
+      slug: studio.slug,
+      operating_hours: studio.operating_hours,
+      company_slug: studio.company.slug,
+      price: studio.prices.length > 0 ? studio.prices[0].total_price : 0,
+    }))
 
-  const badgesFilter = filterShow.find((filter) => filter.key == "badges")
-  if (badgesFilter) {
-    badgesFilter.options = studiosData
-      .map((studio) => studio.badges)
-      .flat()
-      .filter(
-        (badge, index, self) =>
-          index === self.findIndex((b) => b.name === badge.name),
-      )
-      .map((badge) => ({
-        id: badge.id,
-        name: badge.name.charAt(0).toUpperCase() + badge.name.slice(1),
-      }))
+    const badgesFilter = filterShow.find((filter) => filter.key == "badges")
+    if (badgesFilter) {
+      badgesFilter.options = studiosData
+        .map((studio) => studio.badges)
+        .flat()
+        .filter(
+          (badge, index, self) =>
+            index === self.findIndex((b) => b.name === badge.name),
+        )
+        .map((badge) => ({
+          id: badge.id,
+          name: badge.name.charAt(0).toUpperCase() + badge.name.slice(1),
+        }))
+    }
+  } catch (error) {
+    console.error(`Failed to fetch studios for city ${cityId}:`, error)
+    throw error
   }
 }
 
@@ -345,18 +375,28 @@ const updateURL = () => {
   })
 }
 
-const loadFromLocalStorage = () => {
+const loadFromLocalStorage = async () => {
   const savedCountry = localStorage.getItem("selectedCountry")
   const savedCity = localStorage.getItem("selectedCity")
   const savedSearchTerm = localStorage.getItem("searchTerm")
+
   if (savedCountry) {
-    selectedCountry.value = savedCountry
-    handleCountryChange(selectedCountry.value)
+    try {
+      selectedCountry.value = savedCountry
+      await handleCountryChange(selectedCountry.value)
+
+      // Validate city if saved
+      if (savedCity) {
+        selectedCity.value = savedCity
+        await handleCityChange(savedCity)
+      }
+    } catch (error) {
+      // Clear invalid localStorage on error
+      console.error('Failed to load saved filters:', error)
+      clearFilters()
+    }
   }
-  if (savedCity) {
-    selectedCity.value = savedCity
-    handleCityChange(selectedCity.value)
-  }
+
   if (savedSearchTerm) {
     searchTerm.value = savedSearchTerm
   }

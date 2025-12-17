@@ -185,7 +185,9 @@ def build_studio_dict(
                 "id": b.id,
                 "name": b.name,
                 "image": get_public_url(b.image) if b.image else None,
-                "description": getattr(b, 'description', None)
+                "description": getattr(b, 'description', None),
+                "created_at": b.created_at,
+                "updated_at": b.updated_at
             }
             for b in address.badges
         ],
@@ -193,6 +195,7 @@ def build_studio_dict(
             {
                 "id": r.id,
                 "name": r.name,
+                "address_id": r.address_id,
                 "photos": [
                     {"id": p.id, "path": _transform_photo_path(p.path), "index": p.index}
                     for p in r.photos

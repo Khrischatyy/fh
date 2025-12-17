@@ -6,7 +6,7 @@
   >
     <Spinner :is-loading="!address"/>
     <div
-        v-if="address && address.is_complete"
+        v-if="address && address.is_complete && address?.photos?.length > 0"
         ref="photoContainer"
         style="width: -webkit-fill-available"
         class="photo-container animate__animated animate__fadeInDown w-full max-h-[250px] max-w-full backdrop-blur p-0 py-5 md:p-10"
@@ -18,13 +18,7 @@
           role="dialog"
           aria-hidden="true"
       ></div>
-      <div v-if="address?.photos?.length === 0" class="w-full flex justify-center items-center">
-        <div class="text-white text-2xl font-[BebasNeue] text-center">
-          Studio owner didn't add photos
-        </div>
-      </div>
       <ScrollContainer
-          v-if="address?.photos?.length > 0"
           :justify-content="address?.photos?.length >= 7 ? 'start' : 'center'"
           justofy-content-mobile="start"
           class="rounded-[10px] h-full"
@@ -189,13 +183,14 @@
               />
             </div>
           </div>
-          <div v-if="address?.rooms.length > 0"
+          <div v-if="roomsWithPrices.length > 0"
                class="flex flex-col items-center w-full text-center mb-10">
             <div class="flex gap-2 font-[BebasNeue] text-4xl text-white justify-center mt-5 items-center underline underline-offset-4 mb-4 underline-offset-8">
               ROOM:
             </div>
-            <div class="flex flex-row gap-4 justify-start w-full max-w-[1200px] overflow-x-auto scrollbar-hide px-4 pb-6 pt-2">
-              <div v-for="room in address?.rooms.filter(r => r.prices.length > 0)"
+            <div class="flex flex-row gap-4 w-full max-w-[1200px] overflow-x-auto scrollbar-hide px-4 pb-6 pt-2"
+                 :class="roomsWithPrices.length === 1 ? 'justify-center' : 'justify-start'">
+              <div v-for="room in roomsWithPrices"
                    @click="chooseRoom(room.id)"
                    class="flex-shrink-0 w-[200px] md:w-[280px] lg:w-[320px] h-[220px] md:h-[280px] lg:h-[320px] p-1">
                 <RoomCard
@@ -208,7 +203,7 @@
             </div>
           </div>
           <div
-              v-if="address"
+              v-if="address && address.engineers && address.engineers.filter(e => e.role === 'studio_engineer').length > 0"
               class="max-w-[212px] m-auto w-full justify-between gap-1.5 items-center flex-col text-center mb-10"
           >
             <div
@@ -517,6 +512,9 @@ const teammatesOptions = computed(() => {
   return options;
 });
 
+const roomsWithPrices = computed(() => {
+  return address.value?.rooms?.filter(r => r.prices.length > 0) || [];
+});
 
 const roomsOptions = computed(() => address.value?.rooms.map((room) => ({
   id: room.id,

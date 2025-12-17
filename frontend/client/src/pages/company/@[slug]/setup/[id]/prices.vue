@@ -117,16 +117,15 @@ function sendPrice(price) {
 
   updatePrice(price)
     .then((response) => {
-      response.data.forEach((price, index) => {
-        const newOrUpdatePrice = prices.value.find(
-          (p) => p.hours === price.hours,
-        )
-        if (newOrUpdatePrice) {
-          newOrUpdatePrice.id = price.id
-        } else {
-          prices.value.push(price)
-        }
-      })
+      const returnedPrice = response.data
+      const newOrUpdatePrice = prices.value.find(
+        (p) => p.hours === returnedPrice.hours,
+      )
+      if (newOrUpdatePrice) {
+        newOrUpdatePrice.id = returnedPrice.id
+      } else {
+        prices.value.push(returnedPrice)
+      }
       isLoading.value = false
     })
     .catch((error) => {
@@ -137,7 +136,7 @@ function sendPrice(price) {
 function deletePrice(price, index) {
   isLoading.value = true
   const { delete: removePrice } = useApi({
-    url: `/room/prices?room_id=${route.query.room_id}&room_price_id=${price.id}`,
+    url: `/rooms/prices/${price.id}?room_id=${route.query.room_id}`,
     auth: true,
   })
 
