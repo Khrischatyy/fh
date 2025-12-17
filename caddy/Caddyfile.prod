@@ -98,11 +98,7 @@ funny-how.com www.funny-how.com {
 
     # Socket.io chat service
     handle /socket.io/* {
-        reverse_proxy chat:6001 {
-            # WebSocket support
-            header_up Connection {>Connection}
-            header_up Upgrade {>Upgrade}
-        }
+        reverse_proxy chat:6001
     }
 
     # Frontend (Nuxt) - handle all other requests

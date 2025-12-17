@@ -6,9 +6,14 @@
     </button>
 
     <!-- Модальное окно чата с использованием Popup -->
-    <Popup :open="isChatModalOpen" @close="closeChatModal" title="Chat with {{ client?.firstname }}">
+    <Popup
+      :open="isChatModalOpen"
+      @close="closeChatModal"
+      title="Chat with {{ client?.firstname }}"
+      modalContentClass="w-[500px] max-w-[95vw] max-h-[70vh] h-[630px]"
+    >
       <template #body>
-        <div class="chat-modal-body flex flex-col h-[400px] bg-[#1a1a1a] rounded-lg overflow-hidden">
+        <div class="chat-modal-body flex flex-col bg-[#1a1a1a] rounded-lg overflow-hidden h-full">
           <!-- Область сообщений -->
           <div ref="messagesContainer" class="messages-area flex-1 overflow-y-auto p-4 bg-gray-100">
             <div v-for="(message, index) in messages" :key="index" :class="['message', message.isOwner ? 'bg-blue-500 text-white' : 'bg-gray-300 text-black']">
@@ -93,7 +98,6 @@ onMounted(scrollToBottom);
 }
 
 .messages-area {
-  max-height: 300px;
   overflow-y: auto;
   padding: 1rem;
   background-color: #f3f4f6;

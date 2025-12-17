@@ -99,12 +99,14 @@ const props = withDefaults(
     open: boolean
     type?: PopupType
     scrollToClose?: boolean
+    modalContentClass?: string
   }>(),
   {
     title: "",
     open: false,
     type: "default",
     scrollToClose: false,
+    modalContentClass: "",
   },
 )
 </script>
@@ -113,16 +115,20 @@ const props = withDefaults(
   <div
     v-if="open"
     ref="modalElement"
-    class="modal backdrop-blur-[10px] overflow-hidden fixed inset-0 flex items-center justify-center p-0 sm:p-10 overflow-y-auto z-[1001]"
+    class="modal backdrop-blur-[10px] overflow-hidden fixed inset-0 flex items-center justify-center p-4 sm:p-10 overflow-y-auto z-[1001]"
   >
     <div
-      :class="{
-        'max-w-lg mx-auto': props.type == 'small',
-        'max-w-3xl': props.type == 'medium',
-        'max-w-6xl': props.type == 'large',
-      }"
+      :class="[
+        {
+          'max-w-lg mx-auto': props.type == 'small',
+          'max-w-3xl': props.type == 'medium',
+          'max-w-6xl': props.type == 'large',
+          'max-w-2xl': props.type == 'default',
+        },
+        props.modalContentClass || ''
+      ]"
       :style="{ transform: `translateY(${modalPosition}px)` }"
-      class="modal-content flex flex-col gap-5 bg-[#171717] rounded-[10px] shadow-lg w-full p-6 relative z-20"
+      class="modal-content flex flex-col gap-5 bg-[#171717] rounded-[10px] shadow-lg w-full max-h-[90vh] p-6 relative z-20"
     >
       <div class="modal-header grid grid-cols-auto-fit items-center mb-4">
         <slot name="header" class="text-white text-[22px]/[26px] font-bold" />

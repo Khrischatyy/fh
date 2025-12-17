@@ -116,7 +116,7 @@ app.state.settings = settings
 # Add proxy headers middleware (must be first to handle X-Forwarded-* headers)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
-# Add session middleware for admin authentication
+# Add session middleware for SQLAdmin authentication
 app.add_middleware(SessionMiddleware, secret_key=settings.admin_secret_key)
 
 # Setup SQLAdmin

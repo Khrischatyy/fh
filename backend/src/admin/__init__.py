@@ -1,9 +1,10 @@
 """
 Admin Panel Module.
-Provides SQLAdmin interface with basic HTTP authentication.
+Provides SQLAdmin interface with email-based authentication.
 """
 from sqladmin import Admin
-from src.admin.auth import BasicAuthBackend
+
+from src.admin.auth import SuperuserAuthBackend
 from src.admin.views import (
     UserAdmin,
     EngineerRateAdmin,
@@ -13,7 +14,6 @@ from src.admin.views import (
     AddressAdmin,
     OperatingModeAdmin,
     OperatingHourAdmin,
-    StudioClosureAdmin,
     BadgeAdmin,
     EquipmentTypeAdmin,
     EquipmentAdmin,
@@ -24,11 +24,11 @@ from src.admin.views import (
     BookingAdmin,
     CountryAdmin,
     CityAdmin,
-    ChargeAdmin,
-    PayoutAdmin,
+    MessageAdmin,
     DeviceAdmin,
     DeviceLogAdmin,
 )
+from src.config import settings
 
 
 def setup_admin(app, engine):
@@ -37,65 +37,46 @@ def setup_admin(app, engine):
 
     Args:
         app: FastAPI application instance
-        engine: SQLAlchemy async engine
+        engine: SQLAlchemy sync engine
 
     Returns:
         Admin: Configured SQLAdmin instance
     """
-    from src.config import settings
-
     # Create authentication backend
-    authentication_backend = BasicAuthBackend(secret_key=settings.admin_secret_key)
+    authentication_backend = SuperuserAuthBackend(secret_key=settings.admin_secret_key)
 
-    # Initialize admin with proper base URL for HTTPS
+    # Create admin with authentication
     admin = Admin(
         app,
         engine,
         title="Funny How Admin",
-        base_url="/admin",
         authentication_backend=authentication_backend,
     )
 
-    # Register Authentication views
+    # Register all views
     admin.add_view(UserAdmin)
     admin.add_view(EngineerRateAdmin)
     admin.add_view(PasswordResetTokenAdmin)
-
-    # Register Studio views
     admin.add_view(CompanyAdmin)
     admin.add_view(AdminCompanyAdmin)
     admin.add_view(AddressAdmin)
     admin.add_view(OperatingModeAdmin)
     admin.add_view(OperatingHourAdmin)
-    admin.add_view(StudioClosureAdmin)
     admin.add_view(BadgeAdmin)
-
-    # Register Equipment views
     admin.add_view(EquipmentTypeAdmin)
     admin.add_view(EquipmentAdmin)
-
-    # Register Room views
     admin.add_view(RoomAdmin)
     admin.add_view(RoomPhotoAdmin)
     admin.add_view(RoomPriceAdmin)
-
-    # Register Booking views
     admin.add_view(BookingStatusAdmin)
     admin.add_view(BookingAdmin)
-
-    # Register Geographic views
     admin.add_view(CountryAdmin)
     admin.add_view(CityAdmin)
-
-    # Register Payment views
-    admin.add_view(ChargeAdmin)
-    admin.add_view(PayoutAdmin)
-
-    # Register Device views
+    admin.add_view(MessageAdmin)
     admin.add_view(DeviceAdmin)
     admin.add_view(DeviceLogAdmin)
 
     return admin
 
 
-__all__ = ["setup_admin", "BasicAuthBackend"]
+__all__ = ["setup_admin", "SuperuserAuthBackend"]

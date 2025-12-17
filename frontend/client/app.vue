@@ -3,12 +3,14 @@
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
+    <Toast />
   </div>
 </template>
 
 <script setup>
 import {useTooltip} from "~/src/shared/ui/Tooltip/";
 import {usePhotoSwipe} from "~/src/shared/ui/components/PhotoSwipe";
+import Toast from "~/src/shared/ui/Toast/Toast.vue";
 import { provide} from 'vue';
 
 useTooltip()
