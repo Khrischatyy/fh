@@ -20,6 +20,9 @@ const isLoading = ref(true)
 const errorMessage = ref("")
 const successMessage = ref("")
 const expiresAt = ref("")
+const deviceName = ref("")
+const devicePassword = ref("")
+const showPasswordInfo = ref(false)
 
 const sessionId = computed(() => route.query.session_id as string)
 const deviceUuid = computed(() => route.query.device_uuid as string)
@@ -51,6 +54,14 @@ const processPayment = async () => {
           hour: '2-digit',
           minute: '2-digit',
         })
+      }
+
+      // Store device info and password
+      if (response.device_name) {
+        deviceName.value = response.device_name
+      }
+      if (response.device_password) {
+        devicePassword.value = response.device_password
       }
     } else {
       errorMessage.value = response.message || "Payment verification failed."
@@ -84,6 +95,30 @@ onMounted(async () => {
           <div v-if="expiresAt" class="expires-info">
             <p class="text-white/60">Your device is unlocked until:</p>
             <p class="text-2xl font-semibold text-white mt-2">{{ expiresAt }}</p>
+          </div>
+
+          <!-- Device Password Display -->
+          <div v-if="devicePassword" class="password-info">
+            <div class="password-header">
+              <p class="text-white/60 text-sm">Device Password:</p>
+              <button
+                @click="showPasswordInfo = !showPasswordInfo"
+                class="info-button"
+                title="Click for more info"
+              >
+                ℹ
+              </button>
+            </div>
+            <p class="text-3xl font-bold text-white mt-2 font-mono password-text">{{ devicePassword }}</p>
+            <p v-if="deviceName" class="text-white/50 text-xs mt-2">{{ deviceName }}</p>
+
+            <!-- Explanatory notification -->
+            <div v-if="showPasswordInfo" class="password-explanation">
+              <p class="text-sm text-white/80">
+                💡 This is the password you set in the device modal. It won't change anything on your computer -
+                it's just for showing the client the password from the computer if they don't know it.
+              </p>
+            </div>
           </div>
         </div>
         <div class="flex justify-center items-center gap-2.5">
@@ -161,5 +196,70 @@ onMounted(async () => {
   background-color: rgba(255, 255, 255, 0.05);
   border-radius: 10px;
   display: inline-block;
+}
+
+.password-info {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background-color: rgba(59, 130, 246, 0.1);
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-radius: 10px;
+  display: inline-block;
+  min-width: 400px;
+}
+
+.password-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.info-button {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.info-button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.password-text {
+  letter-spacing: 0.05em;
+  user-select: all;
+  cursor: text;
+}
+
+.password-explanation {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  border-left: 3px solid rgba(59, 130, 246, 0.5);
+  text-align: left;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

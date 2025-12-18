@@ -83,7 +83,6 @@ class Settings(BaseSettings):
 
     # Frontend URLs for emails
     frontend_url: str = "http://127.0.0.1"  # Will be overridden by .env
-    frontend_url_for_qr: str = "http://192.168.1.227"  # For QR codes - use local IP for testing
     unsubscribe_url: str = "https://funny-how.com/unsubscribe"
     email_assets_base_url: str = "https://funny-how.com/mail"
 

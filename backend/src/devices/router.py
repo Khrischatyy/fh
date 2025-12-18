@@ -371,7 +371,9 @@ async def device_payment_success(
             success=result['success'],
             message=result['message'],
             unlock_session_id=result['unlock_session_id'],
-            expires_at=result['expires_at']
+            expires_at=result['expires_at'],
+            device_name=result.get('device_name'),
+            device_password=result.get('device_password')
         )
 
     except Exception as e:
