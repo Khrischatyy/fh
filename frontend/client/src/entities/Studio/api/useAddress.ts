@@ -73,7 +73,6 @@ export function useAddress(slug: string | RouteParamValue[]) {
   const resolvedSlug = typeof slug === "string" ? slug : slug.value
   const { fetch: getBrand } = useApi<AddressResponse>({
     url: `/address/studio/${resolvedSlug}`,
-    auth: true,
   })
 
   //useAsyncData helps to serve it server-side

@@ -4,6 +4,7 @@ Handles HTTP requests and delegates to service layer.
 """
 from typing import Annotated, Any
 from fastapi import APIRouter, Depends, status, Query
+from redis.asyncio import Redis
 
 from src.addresses.dependencies import get_address_service
 from src.operating_hours.dependencies import get_operating_hours_service
@@ -25,6 +26,7 @@ from src.addresses.service import AddressService
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
 from src.geographic.schemas import LaravelResponse
+from src.database import get_redis
 
 
 router = APIRouter(prefix="/addresses", tags=["Addresses"])
@@ -689,6 +691,7 @@ map_router = APIRouter(prefix="/map", tags=["Map"])
 )
 async def get_map_studios(
     service: Annotated[AddressService, Depends(get_address_service)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> list[MapStudioResponse]:
     """
     Get all studios/addresses for map display.
@@ -713,22 +716,19 @@ async def get_map_studios(
 
     studios = await service.get_all_studios_for_map()
 
-    # Cache Stripe account statuses
-    stripe_cache = {}
-
     # Filter and convert to response format
     response_studios = []
     for studio in studios:
         # FILTER: Only include complete studios for public map view
-        if not should_show_in_public_search(studio, stripe_cache):
+        if not await should_show_in_public_search(studio, redis):
             continue
 
         # Build standardized studio dict
-        studio_dict = build_studio_dict(
+        studio_dict = await build_studio_dict(
             studio,
             include_is_complete=True,
             include_payment_status=False,
-            stripe_cache=stripe_cache
+            redis=redis
         )
 
         # Map view needs specific additional fields

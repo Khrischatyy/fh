@@ -420,9 +420,9 @@ async def _calculate_payouts_ready(address: "Address", redis: Optional[Redis] = 
     return False
 
 
-def should_show_in_public_search(address: "Address", stripe_cache: Optional[dict] = None) -> bool:
+async def should_show_in_public_search(address: "Address", redis: Optional[Redis] = None) -> bool:
     """
-    Determine if a studio should be shown in public search results.
+    Determine if a studio should be shown in public search results (ASYNC).
 
     Business rules:
     - Studio must be complete (has operating hours + payment gateway)
@@ -430,20 +430,17 @@ def should_show_in_public_search(address: "Address", stripe_cache: Optional[dict
 
     Args:
         address: The Address/studio to check
-        stripe_cache: Optional Stripe cache to avoid repeated API calls
+        redis: Optional Redis client for caching
 
     Returns:
         True if studio should be visible in search, False otherwise
     """
-    if stripe_cache is None:
-        stripe_cache = {}
-
     # Must have operating hours
     if len(address.operating_hours) == 0:
         return False
 
     # Must have payment gateway ready for payouts
-    if not _calculate_payouts_ready(address, stripe_cache):
+    if not await _calculate_payouts_ready(address, redis):
         return False
 
     return True

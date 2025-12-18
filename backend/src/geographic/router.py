@@ -4,10 +4,12 @@ Matches Laravel API routes for backward compatibility.
 """
 from typing import Annotated, Any
 from fastapi import APIRouter, Depends, status
+from redis.asyncio import Redis
 
 from src.geographic.schemas import CountryResponse, CityResponse, LaravelResponse
 from src.geographic.service import GeographicService
 from src.geographic.dependencies import get_geographic_service
+from src.database import get_redis
 
 router = APIRouter(tags=["Geographic"])
 
@@ -82,6 +84,7 @@ city_router = APIRouter(prefix="/city")
 )
 async def get_city_studios(
     city_id: int,
+    redis: Annotated[Redis, Depends(get_redis)],
 ):
     """
     Retrieve all studios (addresses) in a specific city.
@@ -92,6 +95,7 @@ async def get_city_studios(
 
     Args:
         city_id: The city ID
+        redis: Redis client for caching
 
     Returns:
         List of complete studios in the city
@@ -123,22 +127,19 @@ async def get_city_studios(
                 code=404
             )
 
-        # Cache Stripe account statuses to avoid repeated API calls
-        stripe_cache = {}
-
         # Filter and convert addresses to dict format
         addresses_data = []
         for address in addresses:
             # FILTER: Only include studios that should be shown in public search
-            if not should_show_in_public_search(address, stripe_cache):
+            if not await should_show_in_public_search(address, redis):
                 continue
 
             # Build standardized studio dict
-            addr_dict = build_studio_dict(
+            addr_dict = await build_studio_dict(
                 address,
                 include_is_complete=True,
                 include_payment_status=True,
-                stripe_cache=stripe_cache
+                redis=redis
             )
 
             addresses_data.append(addr_dict)

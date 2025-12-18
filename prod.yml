@@ -30,7 +30,7 @@ services:
       dockerfile: Dockerfile
       args:
         - NODE_ENV=production
-        - AXIOS_BASEURL=http://caddy
+        - AXIOS_BASEURL=http://api:8000
         - AXIOS_BASEURL_CLIENT=https://funny-how.com
         - AXIOS_API_VERSION=/api
         - NUXT_ENV_GOOGLE_MAPS_API=${GOOGLE_MAPS_API}
@@ -42,10 +42,10 @@ services:
     environment:
       - NODE_ENV=production
       - NUXT_ENV_GOOGLE_MAPS_API=${GOOGLE_MAPS_API}
-      - AXIOS_BASEURL=http://caddy
+      - AXIOS_BASEURL=http://api:8000
       - AXIOS_BASEURL_CLIENT=https://funny-how.com
       - AXIOS_API_VERSION=/api
-      - NUXT_PUBLIC_API_BASE=http://caddy/api
+      - NUXT_PUBLIC_API_BASE=http://api:8000/api
       - NUXT_PUBLIC_SUPPORT_USER_ID=${SUPPORT_USER_ID}
       - NUXT_PUBLIC_SUPPORT_ADDRESS_ID=${SUPPORT_ADDRESS_ID}
     networks:
