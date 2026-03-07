@@ -130,7 +130,7 @@ const props = withDefaults(
       :style="{ transform: `translateY(${modalPosition}px)` }"
       class="modal-content flex flex-col gap-5 bg-[#171717] rounded-[10px] shadow-lg w-full max-h-[90vh] p-6 relative z-20"
     >
-      <div class="modal-header grid grid-cols-auto-fit items-center mb-4">
+      <div class="modal-header grid grid-cols-auto-fit items-center">
         <slot name="header" class="text-white text-[22px]/[26px] font-bold" />
         <slot name="center_header"> </slot>
         <slot class="text-right" name="action_header">
@@ -145,7 +145,7 @@ const props = withDefaults(
           </div>
         </slot>
       </div>
-      <div class="modal-body mb-10">
+      <div class="modal-body">
         <slot name="body" />
       </div>
       <div class="modal-footer w-full">

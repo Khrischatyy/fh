@@ -6,61 +6,75 @@
       name="dashboard"
     >
       <div class="container mx-auto px-2 md:px-4">
-        <!-- Header -->
-        <div class="mb-6">
-          <!-- Compact Info Card -->
-          <div class="bg-gradient-to-br from-neutral-900 to-black border border-white border-opacity-20 rounded-2xl p-6 mb-6 shadow-xl">
-            <div class="flex items-start justify-between gap-6 flex-wrap">
-              <!-- Left Side - Info -->
-              <div class="flex-1 min-w-[280px]">
-                <div class="flex items-center gap-3 mb-3">
-                  <h3 class="text-xl font-bold text-white">Register Device</h3>
-                </div>
-                <p class="text-neutral-400 text-sm mb-4 leading-relaxed">
-                  Generate a secure one-time token to register your Mac device without entering passwords.
-                </p>
-                <div class="flex flex-wrap gap-2 text-xs text-neutral-500">
-                  <span class="bg-neutral-800 px-2 py-1 rounded">Step 1: Generate</span>
-                  <span class="bg-neutral-800 px-2 py-1 rounded">Step 2: Copy</span>
-                  <span class="bg-neutral-800 px-2 py-1 rounded">Step 3: Register</span>
-                </div>
+        <!-- Setup Section -->
+        <div class="mb-8">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- Step 1: Download App -->
+            <div class="bg-neutral-900/60 border border-white/[0.06] rounded-[10px] p-5">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center text-xs font-semibold text-white/60">1</div>
+                <span class="text-sm font-medium text-white/90">Download App</span>
               </div>
+              <p class="text-xs text-white/40 leading-relaxed mb-4">Install FunnyHow Device Monitor on your Mac.</p>
+              <a
+                href="/api/downloads/FunnyHow-DeviceMonitor.dmg"
+                class="block w-full px-4 py-2.5 bg-white text-black rounded-lg text-sm font-semibold text-center border border-dashed border-white/[0.12]"
+                download="FunnyHow-DeviceMonitor.dmg"
+              >
+                Download .dmg
+              </a>
+            </div>
 
-              <!-- Right Side - Actions -->
-              <div class="flex flex-col gap-3 min-w-[200px]">
-                <button
-                  @click="generateToken"
-                  :disabled="isGeneratingToken"
-                  class="px-6 py-3 bg-white text-black rounded-lg hover:opacity-90 disabled:opacity-50 font-medium transition-all shadow-lg hover:shadow-xl disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  <span>{{ isGeneratingToken ? 'Generating...' : 'Generate Token' }}</span>
-                </button>
-                <a
-                  href="/api/downloads/FunnyHow-DeviceMonitor.dmg"
-                  class="px-6 py-3 bg-neutral-800 text-white rounded-lg hover:bg-neutral-700 transition-all font-medium flex items-center justify-center gap-2 border border-neutral-700"
-                  download="FunnyHow-DeviceMonitor.dmg"
-                >
-                  <span>Download App</span>
-                </a>
+            <!-- Step 2: Generate Token -->
+            <div class="bg-neutral-900/60 border border-white/[0.06] rounded-[10px] p-5">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center text-xs font-semibold text-white/60">2</div>
+                <span class="text-sm font-medium text-white/90">Generate Token</span>
+              </div>
+              <p class="text-xs text-white/40 leading-relaxed mb-4">Create a secure one-time token for device registration.</p>
+              <button
+                @click="generateToken"
+                :disabled="isGeneratingToken"
+                class="w-full px-4 py-2.5 bg-white/[0.06] text-white/50 rounded-lg text-sm font-medium border border-dashed border-white/[0.12] disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {{ isGeneratingToken ? 'Generating...' : 'Generate Token' }}
+              </button>
+            </div>
+
+            <!-- Step 3: Register -->
+            <div class="bg-neutral-900/60 border border-white/[0.06] rounded-[10px] p-5">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center text-xs font-semibold text-white/60">3</div>
+                <span class="text-sm font-medium text-white/90">Register</span>
+              </div>
+              <p class="text-xs text-white/40 leading-relaxed mb-4">Paste the token in the app to link your device.</p>
+              <div class="w-full px-4 py-2.5 bg-white/[0.03] border border-dashed border-white/[0.1] rounded-lg text-sm text-white/30 text-center">
+                Waiting for device...
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Devices Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Devices Section -->
+        <div class="mb-4 flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-white/60 uppercase tracking-wider">Your Devices</h3>
+          <span class="text-xs text-white/30">{{ devices.length }} device{{ devices.length !== 1 ? 's' : '' }}</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Spinner :is-loading="isLoading" />
 
           <!-- Empty State -->
           <div
             v-if="devices.length === 0 && !isLoading"
-            class="col-span-full p-[10px] text-white rounded-[10px] h-full flex items-center justify-center border border-dashed border-white border-opacity-20"
+            class="col-span-full bg-neutral-900/40 border border-dashed border-white/[0.08] rounded-[10px] py-16 flex items-center justify-center"
           >
-            <div class="flex flex-col justify-center text-center items-center m-10">
-              <IconMonitor class="w-16 h-16 mb-4 opacity-50" />
-              <span class="text-xl text-neutral-700">No devices registered yet</span>
-              <span class="text-sm text-neutral-600 mt-2">
-                Download the Mac OS app and sign in to automatically register your first device
+            <div class="flex flex-col justify-center text-center items-center max-w-xs">
+              <div class="flex items-center justify-center mb-4">
+                <IconMonitor class="w-10 h-10 text-white/20" />
+              </div>
+              <span class="text-sm font-medium text-white/40">No devices registered yet</span>
+              <span class="text-xs text-white/20 mt-1.5 leading-relaxed">
+                Follow the steps above to register your first Mac device
               </span>
             </div>
           </div>
@@ -90,60 +104,55 @@
       <!-- Token Display Modal -->
       <div
         v-if="showTokenModal"
-        class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+        class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
         @click.self="showTokenModal = false"
       >
-        <div class="bg-neutral-900 rounded-lg p-6 max-w-lg w-full border border-neutral-800">
-          <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-bold text-white">Token Generated</h2>
+        <div class="bg-[#171717] rounded-[10px] p-5 max-w-md w-full border border-white/[0.08]">
+          <!-- Header -->
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <h2 class="text-base font-semibold text-white mb-1">Token</h2>
+              <p class="text-xs text-white/40">Paste this in the FunnyHow app on your Mac</p>
+            </div>
             <button
               @click="showTokenModal = false"
-              class="text-neutral-400 hover:text-white transition-colors"
+              class="w-6 h-6 rounded-md hover:bg-white/[0.08] flex items-center justify-center"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-3 h-3 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
 
-          <p class="text-neutral-400 text-sm mb-4">
-            Copy this token and paste it in your Mac OS app
-          </p>
-
-          <div class="bg-neutral-800 bg-opacity-40 border border-neutral-600 rounded-lg p-3 mb-3">
-            <p class="text-neutral-300 text-xs font-medium mb-2">Important:</p>
-            <ul class="text-neutral-400 text-xs space-y-1">
-              <li>• Expires in 24 hours</li>
-              <li>• Single-use only</li>
-              <li>• Keep secure</li>
-            </ul>
+          <!-- Token Display -->
+          <div class="bg-black/40 border border-white/[0.06] rounded-lg px-4 py-3 mb-3 flex items-center justify-between gap-3">
+            <code class="text-white/80 font-mono text-xs truncate block">{{ maskedToken }}</code>
+            <button
+              @click="showFullToken = !showFullToken"
+              class="text-[11px] text-white/30 shrink-0"
+            >
+              {{ showFullToken ? 'Hide' : 'Show' }}
+            </button>
           </div>
 
-          <div class="bg-neutral-950 border border-neutral-700 rounded-lg p-3 mb-4">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-neutral-400 text-xs font-mono">TOKEN</span>
-              <button
-                @click="copyToken"
-                class="px-3 py-1 bg-white text-black text-xs rounded hover:opacity-90 transition-opacity font-medium"
-              >
-                {{ tokenCopied ? 'Copied!' : 'Copy' }}
-              </button>
+          <!-- Copy Button -->
+          <button
+            @click="copyToken"
+            class="w-full py-2.5 rounded-lg text-sm font-medium mb-3"
+            :class="tokenCopied ? 'bg-transparent text-green-400 border border-green-500/30' : 'bg-transparent text-white/50 border border-dashed border-white/[0.12]'"
+          >
+            {{ tokenCopied ? 'Copied to clipboard' : 'Copy Token' }}
+          </button>
+
+          <!-- Info -->
+          <div class="flex items-center justify-between text-[11px] text-white/30">
+            <div class="flex items-center gap-3">
+              <span>Single-use</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-white/20"></span>
+              <span>24h expiry</span>
             </div>
-            <code class="text-white font-mono text-xs break-all block">{{ generatedToken }}</code>
+            <span>{{ tokenExpiresAt }}</span>
           </div>
-
-          <div class="space-y-2">
-            <p class="text-white font-medium text-sm">How to use:</p>
-            <ol class="text-neutral-300 text-xs space-y-1 ml-4">
-              <li>1. Open FunnyHow Device Locker on your Mac</li>
-              <li>2. Click menu bar icon and select "Register with Token..."</li>
-              <li>3. Paste this token when prompted</li>
-            </ol>
-          </div>
-
-          <p class="text-neutral-500 text-xs text-center mt-4">
-            Expires: {{ tokenExpiresAt }}
-          </p>
         </div>
       </div>
     </NuxtLayout>
@@ -151,7 +160,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue"
+import { ref, computed, onMounted } from "vue"
 import { useApi } from "~/src/lib/api"
 import { Spinner, IconMonitor } from "~/src/shared/ui/common"
 import DeviceCard from "~/src/entities/Device/ui/DeviceCard.vue"
@@ -187,6 +196,13 @@ const generatedToken = ref('')
 const tokenCopied = ref(false)
 const isGeneratingToken = ref(false)
 const tokenExpiresAt = ref('')
+const showFullToken = ref(false)
+
+const maskedToken = computed(() => {
+  if (!generatedToken.value) return ''
+  if (showFullToken.value) return generatedToken.value
+  return generatedToken.value.slice(0, 16) + '••••••••'
+})
 
 onMounted(async () => {
   // Check authentication

@@ -175,153 +175,100 @@ watch(() => props.device, (newDevice) => {
 </script>
 
 <template>
-  <Popup
-    :scroll-to-close="true"
-    type="small"
-    :title="'Manage Device'"
-    :open="showPopup"
-    @close="closePopup"
+  <div
+    v-if="showPopup"
+    class="fixed inset-0 flex items-center justify-center z-[1001] p-4"
   >
-    <template #header>
-      <div class="flex justify-start items-center gap-4">
-        <div class="h-[35px] w-[35px] flex items-center justify-center bg-white bg-opacity-10 rounded">
-          <IconMonitor class="w-6 h-6" />
-        </div>
-        <div>
-          <h3 class="text-xl font-bold text-white mb-1">
-            {{ device?.name }}
-          </h3>
-          <p
-            :class="getStatusColor()"
-            class="font-['Montserrat'] text-sm"
-          >
-            {{ getStatusText() }}
-          </p>
-        </div>
-      </div>
-    </template>
-    <template #body>
-      <div class="flex flex-col gap-6 justify-between items-center relative">
-        <Spinner :is-loading="isLoading" />
+    <!-- Backdrop -->
+    <div @click="closePopup" class="fixed inset-0 bg-black/60 z-10"></div>
 
-        <!-- Device Info (Read-only) -->
-        <div class="w-full bg-neutral-900 p-4 rounded-lg">
-          <div class="flex flex-col gap-4 text-sm">
-            <div class="flex items-center gap-2 pb-4">
-              <IconAddress class="opacity-20" />
-              <div class="flex flex-col gap-0.5">
-                <span class="text-white opacity-20 text-xs">MAC Address</span>
-                <span class="text-white text-sm font-mono">{{ device.mac_address }}</span>
-              </div>
-            </div>
-
-            <div class="flex items-center gap-2 pb-4">
-              <IconClock class="opacity-20" />
-              <div class="flex flex-col gap-0.5">
-                <span class="text-white opacity-20 text-xs">Last Seen</span>
-                <span class="text-white text-sm">{{ formatLastSeen() }}</span>
-              </div>
-            </div>
-
-            <div v-if="device.os_version" class="flex items-center gap-2 pb-4">
-              <IconMonitor class="opacity-20" />
-              <div class="flex flex-col gap-0.5">
-                <span class="text-white opacity-20 text-xs">OS Version</span>
-                <span class="text-white text-sm">{{ device.os_version }}</span>
-              </div>
-            </div>
-
-            <div class="flex items-center">
-              <IconMonitor class="opacity-20" />
-              <div class="flex flex-col gap-0.5">
-                <span class="text-white opacity-20 text-xs">Device UUID</span>
-                <span class="text-white font-mono text-xs break-all">{{ device.device_uuid }}</span>
-              </div>
+    <!-- Modal -->
+    <div class="bg-[#171717] rounded-[10px] w-full max-w-md p-5 relative z-20">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-white/[0.06] flex items-center justify-center">
+            <IconMonitor class="w-5 h-5 text-white/60" />
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-white leading-tight">{{ device?.name }}</h3>
+            <div class="flex items-center gap-1.5 mt-0.5">
+              <div
+                class="w-1.5 h-1.5 rounded-full"
+                :class="device.is_blocked ? 'bg-red-500' : device.is_active ? 'bg-green-500' : 'bg-neutral-500'"
+              ></div>
+              <span :class="getStatusColor()" class="text-sm font-medium">{{ getStatusText() }}</span>
             </div>
           </div>
         </div>
+        <button
+          @click="closePopup"
+          class="w-6 h-6 rounded-md hover:bg-white/[0.08] flex items-center justify-center"
+        >
+          <svg class="w-3 h-3 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
 
-        <!-- Editable Fields -->
-        <div class="w-full flex flex-col ">
-          <!-- Device Name -->
-          <div class="pl-4 pr-4">
-            <label class="text-white opacity-20 text-sm font-normal tracking-wide">Device Name</label>
-            <FInputClassic
-              :wide="true"
-              type="text"
-              v-model="formData.name"
-              placeholder="Enter device name"
-            />
-          </div>
-
-          <!-- Device Password -->
-<!--          <div>-->
-<!--            <label class="text-white opacity-20 text-sm font-normal tracking-wide">Device Password</label>-->
-<!--            <div class="flex gap-2">-->
-<!--              <div class="relative flex-1">-->
-<!--                <FInputClassic-->
-<!--                  :wide="true"-->
-<!--                  :type="showPassword ? 'text' : 'password'"-->
-<!--                  v-model="formData.current_password"-->
-<!--                  placeholder="Enter or generate password"-->
-<!--                  class="pr-20"-->
-<!--                />-->
-<!--                <button-->
-<!--                  @click="showPassword = !showPassword"-->
-<!--                  type="button"-->
-<!--                  class="absolute right-3 top-1/2 -translate-y-1/2 text-white opacity-40 hover:opacity-100 text-xs"-->
-<!--                >-->
-<!--                  {{ showPassword ? 'Hide' : 'Show' }}-->
-<!--                </button>-->
-<!--              </div>-->
-<!--              <button-->
-<!--                @click="generatePassword"-->
-<!--                type="button"-->
-<!--                class="px-4 py-2 bg-white bg-opacity-10 hover:bg-opacity-20 rounded-[10px] text-white text-sm font-medium tracking-wide whitespace-nowrap"-->
-<!--              >-->
-<!--                Generate-->
-<!--              </button>-->
-<!--              <button-->
-<!--                v-if="formData.current_password"-->
-<!--                @click="copyPassword"-->
-<!--                type="button"-->
-<!--                class="px-4 py-2 bg-white bg-opacity-10 hover:bg-opacity-20 rounded-[10px] text-white text-sm font-medium tracking-wide"-->
-<!--                :class="passwordCopied ? 'bg-green-700' : ''"-->
-<!--              >-->
-<!--                {{ passwordCopied ? '✓' : 'Copy' }}-->
-<!--              </button>-->
-<!--            </div>-->
-<!--          </div>-->
+      <!-- Device Info -->
+      <div class="mb-4">
+        <div class="flex items-center justify-between py-2.5 border-b border-white/[0.06]">
+          <span class="text-[11px] text-white/30 uppercase tracking-wider">MAC Address</span>
+          <span class="text-xs text-white/70 font-mono">{{ device.mac_address }}</span>
+        </div>
+        <div class="flex items-center justify-between py-2.5 border-b border-white/[0.06]">
+          <span class="text-[11px] text-white/30 uppercase tracking-wider">Last Seen</span>
+          <span class="text-xs text-white/70">{{ formatLastSeen() }}</span>
+        </div>
+        <div v-if="device.os_version" class="flex items-center justify-between py-2.5 border-b border-white/[0.06]">
+          <span class="text-[11px] text-white/30 uppercase tracking-wider">OS</span>
+          <span class="text-xs text-white/70">{{ device.os_version }}</span>
+        </div>
+        <div class="flex items-center justify-between py-2.5">
+          <span class="text-[11px] text-white/30 uppercase tracking-wider">UUID</span>
+          <span class="text-xs text-white/50 font-mono truncate max-w-[220px]">{{ device.device_uuid }}</span>
         </div>
       </div>
-    </template>
-    <template #footer>
-      <div class="flex flex-col gap-3 w-full">
-        <div class="flex justify-between items-center gap-3 w-full">
+
+      <!-- Device Name -->
+      <div class="mb-5">
+        <label class="text-[11px] text-white/30 uppercase tracking-wider block mb-1.5">Device Name</label>
+        <input
+          type="text"
+          v-model="formData.name"
+          placeholder="Enter device name"
+          class="w-full px-3 h-11 outline-none rounded-[10px] border border-dashed border-white/[0.12] hover:border-white/[0.2] focus:border-white/40 bg-transparent text-white text-sm font-medium tracking-wide"
+        />
+      </div>
+
+      <!-- Actions -->
+      <div class="flex flex-col gap-2.5">
+        <div class="flex gap-2.5">
           <button
             @click="handleBlockUnblock"
-            :class="device.is_blocked ? 'bg-green-700 hover:bg-green-800 border-green-700' : 'bg-transparent border-red'"
-            class="flex-1 h-11 p-3.5 hover:opacity-90 rounded-[10px] text-white border text-sm font-medium tracking-wide"
+            class="flex-1 h-11 rounded-[10px] border border-dashed text-sm font-medium tracking-wide"
+            :class="device.is_blocked ? 'border-white/[0.12] hover:border-white/[0.25] hover:bg-white/[0.04] text-white/70' : 'border-orange-500/30 hover:border-orange-500/50 hover:bg-orange-500/[0.04] text-orange-400/80'"
           >
-            {{ device.is_blocked ? 'Unblock Device' : 'Block Device' }}
+            {{ device.is_blocked ? 'Unblock' : 'Block' }}
           </button>
           <button
             @click="handleSave"
             :disabled="isSaving"
-            class="flex-1 h-11 p-3.5 hover:opacity-90 bg-white rounded-[10px] text-black text-sm font-medium tracking-wide disabled:opacity-50"
+            class="flex-1 h-11 rounded-[10px] border border-dashed border-white/[0.12] hover:border-white/[0.25] bg-white/[0.04] hover:bg-white/[0.08] text-white text-sm font-medium tracking-wide disabled:opacity-50"
           >
-            {{ isSaving ? 'Saving...' : 'Save Changes' }}
+            {{ isSaving ? 'Saving...' : 'Save' }}
           </button>
         </div>
         <button
           @click="handleDelete"
-          class="w-full h-11 p-3.5 hover:opacity-90 bg-transparent rounded-[10px] text-red border-red border text-sm font-medium tracking-wide"
+          class="w-full h-11 rounded-[10px] border border-dashed border-red-500/20 hover:border-red-500/40 hover:bg-red-500/[0.04] text-red-400/70 text-sm font-medium tracking-wide"
         >
           Delete Device
         </button>
       </div>
-    </template>
-  </Popup>
+    </div>
+  </div>
 </template>
 
 <style scoped lang="scss"></style>
