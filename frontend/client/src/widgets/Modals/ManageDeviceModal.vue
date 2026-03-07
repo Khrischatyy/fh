@@ -248,21 +248,21 @@ watch(() => props.device, (newDevice) => {
           <button
             @click="handleBlockUnblock"
             class="flex-1 h-11 rounded-[10px] border border-dashed text-sm font-medium tracking-wide"
-            :class="device.is_blocked ? 'border-green-600/30 hover:border-green-600/50 hover:bg-green-600/[0.04] text-green-500/70' : 'border-orange-500/30 hover:border-orange-500/50 hover:bg-orange-500/[0.04] text-orange-400/80'"
+            :class="device.is_blocked ? 'border-green-600/50 bg-green-600/[0.04] hover:border-green-600/30 hover:bg-transparent text-green-500/70 transition-colors' : 'border-orange-500/50 bg-orange-500/[0.04] hover:border-orange-500/30 hover:bg-transparent text-orange-400/80 transition-colors'"
           >
             {{ device.is_blocked ? 'Unblock' : 'Block' }}
           </button>
           <button
             @click="handleSave"
             :disabled="isSaving"
-            class="flex-1 h-11 rounded-[10px] border border-dashed border-white/[0.12] hover:border-white/[0.25] bg-white/[0.04] hover:bg-white/[0.08] text-white text-sm font-medium tracking-wide disabled:opacity-50"
+            class="flex-1 h-11 rounded-[10px] border border-dashed border-white/[0.25] bg-white/[0.08] hover:border-white/[0.12] hover:bg-white/[0.04] text-white text-sm font-medium tracking-wide transition-colors disabled:opacity-50"
           >
             {{ isSaving ? 'Saving...' : 'Save' }}
           </button>
         </div>
         <button
           @click="handleDelete"
-          class="w-full h-11 rounded-[10px] border border-dashed border-red-500/20 hover:border-red-500/40 hover:bg-red-500/[0.04] text-red-400/70 text-sm font-medium tracking-wide"
+          class="w-full h-11 rounded-[10px] border border-dashed border-red-500/40 bg-red-500/[0.04] hover:border-red-500/20 hover:bg-transparent text-red-400/70 text-sm font-medium tracking-wide transition-colors"
         >
           Delete Device
         </button>

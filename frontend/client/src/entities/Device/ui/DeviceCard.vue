@@ -37,7 +37,7 @@
     <!-- Manage Button -->
     <button
       @click.stop="manageDevicePopup"
-      class="w-full py-2.5 bg-white/[0.06] border border-dashed border-white/[0.12] rounded-lg text-white/80 text-xs font-semibold tracking-wide"
+      class="w-full px-4 py-2.5 bg-white/[0.06] border border-dashed border-white/[0.12] rounded-lg text-white/80 text-sm font-medium tracking-wide hover:border-white/[0.25] hover:bg-white/[0.1] transition-colors"
     >
       Manage Device
     </button>

@@ -35,7 +35,7 @@
               <button
                 @click="generateToken"
                 :disabled="isGeneratingToken"
-                class="w-full px-4 py-2.5 bg-white/[0.06] text-white/50 rounded-lg text-sm font-medium border border-dashed border-white/[0.12] disabled:opacity-40 disabled:cursor-not-allowed"
+                class="w-full px-4 py-2.5 bg-white/[0.06] text-white/80 rounded-lg text-sm font-medium tracking-wide border border-dashed border-white/[0.12] hover:border-white/[0.25] hover:bg-white/[0.1] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {{ isGeneratingToken ? 'Generating...' : 'Generate Token' }}
               </button>
