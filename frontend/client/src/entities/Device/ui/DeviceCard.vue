@@ -83,13 +83,13 @@ const getStatusText = () => {
 const getStatusColor = () => {
   if (props.device.is_blocked) return "text-red-500"
   if (!props.device.is_active) return "text-neutral-500"
-  return "text-green-500"
+  return "text-green-500/70"
 }
 
 const getStatusDotClass = () => {
   if (props.device.is_blocked) return "bg-red-500"
   if (!props.device.is_active) return "bg-neutral-500"
-  return "bg-green-500"
+  return "bg-green-600/70"
 }
 
 const formatLastSeen = () => {

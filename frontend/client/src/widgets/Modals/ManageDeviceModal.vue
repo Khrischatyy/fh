@@ -136,7 +136,7 @@ const getStatusColor = () => {
   } else if (!props.device.is_active) {
     return "text-neutral-500"
   } else {
-    return "text-green-500"
+    return "text-green-500/70"
   }
 }
 
@@ -195,7 +195,7 @@ watch(() => props.device, (newDevice) => {
             <div class="flex items-center gap-1.5 mt-0.5">
               <div
                 class="w-1.5 h-1.5 rounded-full"
-                :class="device.is_blocked ? 'bg-red-500' : device.is_active ? 'bg-green-500' : 'bg-neutral-500'"
+                :class="device.is_blocked ? 'bg-red-500' : device.is_active ? 'bg-green-600/70' : 'bg-neutral-500'"
               ></div>
               <span :class="getStatusColor()" class="text-sm font-medium">{{ getStatusText() }}</span>
             </div>
@@ -226,8 +226,8 @@ watch(() => props.device, (newDevice) => {
           <span class="text-xs text-white/70">{{ device.os_version }}</span>
         </div>
         <div class="flex items-center justify-between py-2.5">
-          <span class="text-[11px] text-white/30 uppercase tracking-wider">UUID</span>
-          <span class="text-xs text-white/50 font-mono truncate max-w-[220px]">{{ device.device_uuid }}</span>
+          <span class="text-[11px] text-white/30 uppercase tracking-wider">IP</span>
+          <span class="text-xs text-white/70">{{ device.last_ip || 'Unknown' }}</span>
         </div>
       </div>
 
@@ -248,7 +248,7 @@ watch(() => props.device, (newDevice) => {
           <button
             @click="handleBlockUnblock"
             class="flex-1 h-11 rounded-[10px] border border-dashed text-sm font-medium tracking-wide"
-            :class="device.is_blocked ? 'border-white/[0.12] hover:border-white/[0.25] hover:bg-white/[0.04] text-white/70' : 'border-orange-500/30 hover:border-orange-500/50 hover:bg-orange-500/[0.04] text-orange-400/80'"
+            :class="device.is_blocked ? 'border-green-600/30 hover:border-green-600/50 hover:bg-green-600/[0.04] text-green-500/70' : 'border-orange-500/30 hover:border-orange-500/50 hover:bg-orange-500/[0.04] text-orange-400/80'"
           >
             {{ device.is_blocked ? 'Unblock' : 'Block' }}
           </button>
