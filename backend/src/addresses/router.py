@@ -4,6 +4,7 @@ Handles HTTP requests and delegates to service layer.
 """
 from typing import Annotated, Any
 from fastapi import APIRouter, Depends, status, Query
+from redis.asyncio import Redis
 
 from src.addresses.dependencies import get_address_service
 from src.operating_hours.dependencies import get_operating_hours_service
@@ -25,6 +26,7 @@ from src.addresses.service import AddressService
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
 from src.geographic.schemas import LaravelResponse
+from src.database import get_redis
 
 
 router = APIRouter(prefix="/addresses", tags=["Addresses"])
@@ -302,54 +304,69 @@ async def get_studio_by_slug(
     Raises:
         NotFoundException: If address not found
     """
+    import asyncio
     from src.addresses.repository import AddressRepository
     from src.addresses.utils import build_studio_dict
-    from src.database import AsyncSessionLocal
+    from src.database import AsyncSessionLocal, get_redis
     from src.exceptions import NotFoundException
 
-    async with AsyncSessionLocal() as session:
-        repository = AddressRepository(session)
-        address = await repository.find_by_slug_with_relations(address_slug)
+    try:
+        # Add 10-second timeout for the entire endpoint
+        async with asyncio.timeout(10):
+            async with AsyncSessionLocal() as session:
+                repository = AddressRepository(session)
+                address = await repository.find_by_slug_with_relations(address_slug)
 
-        if not address:
-            raise NotFoundException(f"Address with slug '{address_slug}' not found")
+                if not address:
+                    raise NotFoundException(f"Address with slug '{address_slug}' not found")
 
-        # Build standardized studio dict with is_complete calculation
-        stripe_cache = {}
-        addr_dict = build_studio_dict(
-            address,
-            include_is_complete=True,
-            include_payment_status=False,
-            stripe_cache=stripe_cache
-        )
+                # Get Redis client for Stripe caching
+                redis_client = None
+                try:
+                    async for redis in get_redis():
+                        redis_client = redis
+                        break
+                except Exception:
+                    pass  # Continue without Redis if unavailable
 
-        # Ensure latitude/longitude are strings for this endpoint (Laravel compatibility)
-        if addr_dict.get("latitude") is not None:
-            addr_dict["latitude"] = str(addr_dict["latitude"])
-        if addr_dict.get("longitude") is not None:
-            addr_dict["longitude"] = str(addr_dict["longitude"])
+                # Build standardized studio dict with is_complete calculation (ASYNC)
+                addr_dict = await build_studio_dict(
+                    address,
+                    include_is_complete=True,
+                    include_payment_status=False,
+                    redis=redis_client
+                )
 
-        # Add engineers data (team members)
-        engineers_list = []
-        for engineer in address.engineers:
-            engineers_list.append({
-                "id": engineer.id,
-                "name": engineer.name,
-                "firstname": engineer.firstname,
-                "lastname": engineer.lastname,
-                "username": engineer.username,
-                "email": engineer.email,
-                "phone": engineer.phone,
-                "profile_photo": engineer.profile_photo,
-                "role": engineer.role,
-                "engineer_rate": {
-                    "rate_per_hour": float(engineer.engineer_rate.rate_per_hour) if engineer.engineer_rate else None
-                } if engineer.engineer_rate else None,
-            })
+                # Ensure latitude/longitude are strings for this endpoint (Laravel compatibility)
+                if addr_dict.get("latitude") is not None:
+                    addr_dict["latitude"] = str(addr_dict["latitude"])
+                if addr_dict.get("longitude") is not None:
+                    addr_dict["longitude"] = str(addr_dict["longitude"])
 
-        addr_dict["engineers"] = engineers_list
+                # Add engineers data (team members)
+                engineers_list = []
+                for engineer in address.engineers:
+                    engineers_list.append({
+                        "id": engineer.id,
+                        "name": engineer.name,
+                        "firstname": engineer.firstname,
+                        "lastname": engineer.lastname,
+                        "username": engineer.username,
+                        "email": engineer.email,
+                        "phone": engineer.phone,
+                        "profile_photo": engineer.profile_photo,
+                        "role": engineer.role,
+                        "engineer_rate": {
+                            "rate_per_hour": float(engineer.engineer_rate.rate_per_hour) if engineer.engineer_rate else None
+                        } if engineer.engineer_rate else None,
+                    })
 
-        return addr_dict
+                addr_dict["engineers"] = engineers_list
+
+                return addr_dict
+
+    except asyncio.TimeoutError:
+        raise NotFoundException(f"Request timed out loading studio '{address_slug}'")
 
 
 # Laravel-compatible operating hours endpoints
@@ -674,6 +691,7 @@ map_router = APIRouter(prefix="/map", tags=["Map"])
 )
 async def get_map_studios(
     service: Annotated[AddressService, Depends(get_address_service)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> list[MapStudioResponse]:
     """
     Get all studios/addresses for map display.
@@ -698,22 +716,19 @@ async def get_map_studios(
 
     studios = await service.get_all_studios_for_map()
 
-    # Cache Stripe account statuses
-    stripe_cache = {}
-
     # Filter and convert to response format
     response_studios = []
     for studio in studios:
         # FILTER: Only include complete studios for public map view
-        if not should_show_in_public_search(studio, stripe_cache):
+        if not await should_show_in_public_search(studio, redis):
             continue
 
         # Build standardized studio dict
-        studio_dict = build_studio_dict(
+        studio_dict = await build_studio_dict(
             studio,
             include_is_complete=True,
             include_payment_status=False,
-            stripe_cache=stripe_cache
+            redis=redis
         )
 
         # Map view needs specific additional fields
