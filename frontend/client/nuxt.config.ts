@@ -104,6 +104,17 @@ export default defineNuxtConfig({
     duration: 500,
     mode: "out-in",
   },
+  routeRules: {
+    "/devices": { ssr: false },
+    "/profile": { ssr: false },
+    "/team": { ssr: false },
+    "/booking-management": { ssr: false },
+    "/my-studios": { ssr: false },
+    "/clients": { ssr: false },
+    "/history": { ssr: false },
+    "/payouts": { ssr: false },
+    "/chats": { ssr: false },
+  },
   nitro: {
     routeRules: {
       "/api/**": {

@@ -18,7 +18,7 @@
           v-for="(item, index) in filteredSideMenu"
           :key="item.name"
           :to="item.link"
-          :class="selectedValue == index ? 'border border-white ' : ''"
+          :class="selectedValue == index ? 'border border-dashed border-white/[0.5]' : ''"
           class="block text-lg py-2 rounded-[10px] px-1.5 py-3 flex items-center leading-tight"
         >
           <Component v-if="item.icon" :is="item.icon" class="w-8 h-8 mr-2" />
