@@ -1,7 +1,6 @@
 <template>
   <div>
     <NuxtLayout
-      title="Device Management"
       class="text-white flex flex-col min-h-screen"
       name="dashboard"
     >
@@ -18,7 +17,7 @@
               <p class="text-xs text-white/40 leading-relaxed mb-4">Install FunnyHow Device Monitor on your Mac.</p>
               <a
                 href="/api/downloads/FunnyHow-DeviceMonitor.dmg"
-                class="block w-full px-4 py-2.5 bg-white text-black rounded-lg text-sm font-semibold text-center border border-dashed border-white/[0.12]"
+                class="block w-full px-4 py-2.5 bg-white text-black rounded-lg text-sm font-semibold text-center border border-dashed border-white/[0.12] hover:bg-transparent hover:text-white hover:border-white/[0.25] transition-colors"
                 download="FunnyHow-DeviceMonitor.dmg"
               >
                 Download .dmg
@@ -106,6 +105,9 @@
         v-if="showTokenModal"
         class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
         @click.self="showTokenModal = false"
+        @keydown.esc="showTokenModal = false"
+        tabindex="0"
+        ref="tokenModalRef"
       >
         <div class="bg-[#171717] rounded-[10px] p-5 max-w-md w-full border border-white/[0.08]">
           <!-- Header -->
@@ -139,7 +141,7 @@
           <button
             @click="copyToken"
             class="w-full py-2.5 rounded-lg text-sm font-medium mb-3"
-            :class="tokenCopied ? 'bg-transparent text-green-400 border border-green-500/30' : 'bg-transparent text-white/50 border border-dashed border-white/[0.12]'"
+            :class="tokenCopied ? 'bg-transparent text-green-400 border border-green-500/30' : 'bg-transparent text-white/80 border border-dashed border-white/[0.12] hover:border-white/[0.25] hover:bg-white/[0.06] transition-colors'"
           >
             {{ tokenCopied ? 'Copied to clipboard' : 'Copy Token' }}
           </button>
@@ -160,7 +162,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue"
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue"
 import { useApi } from "~/src/lib/api"
 import { Spinner, IconMonitor } from "~/src/shared/ui/common"
 import DeviceCard from "~/src/entities/Device/ui/DeviceCard.vue"
@@ -191,6 +193,7 @@ const showManageModal = ref(false)
 const selectedDevice = ref<Device | null>(null)
 
 // Token generation state
+const tokenModalRef = ref<HTMLElement | null>(null)
 const showTokenModal = ref(false)
 const generatedToken = ref('')
 const tokenCopied = ref(false)
@@ -204,7 +207,22 @@ const maskedToken = computed(() => {
   return generatedToken.value.slice(0, 16) + '••••••••'
 })
 
+// Auto-focus token modal for ESC support
+watch(showTokenModal, (val) => {
+  if (val) {
+    nextTick(() => tokenModalRef.value?.focus())
+  }
+})
+
+// ESC to close manage device modal
+const onEsc = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && showManageModal.value) {
+    closeManageModal()
+  }
+}
+
 onMounted(async () => {
+  document.addEventListener('keydown', onEsc)
   // Check authentication
   const token = useCookie(ACCESS_TOKEN_KEY).value
   if (!token) {
@@ -220,6 +238,10 @@ onMounted(async () => {
   }
 
   fetchDevices()
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', onEsc)
 })
 
 const fetchDevices = async () => {

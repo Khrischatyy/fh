@@ -10,7 +10,7 @@
           <div>
             <h3 class="text-base font-semibold text-white leading-tight">{{ device.name }}</h3>
             <div class="flex items-center gap-1.5 mt-0.5">
-              <div :class="getStatusDotClass()" class="w-1.5 h-1.5 rounded-full"></div>
+              <div v-if="device.is_active && !device.is_blocked" class="w-1.5 h-1.5 rounded-full bg-green-600/70"></div>
               <span :class="getStatusColor()" class="text-sm font-medium">{{ getStatusText() }}</span>
             </div>
           </div>
@@ -81,7 +81,7 @@ const getStatusText = () => {
 }
 
 const getStatusColor = () => {
-  if (props.device.is_blocked) return "text-red-500"
+  if (props.device.is_blocked) return "text-red-400/70"
   if (!props.device.is_active) return "text-neutral-500"
   return "text-green-500/70"
 }
