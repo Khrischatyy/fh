@@ -21,6 +21,9 @@ export default defineNuxtPlugin(nuxtApp => {
                 sessionStore.setPaymentSession(paymentSessionCookie.value);
             }
 
+            // Hydrate store from cookies first
+            sessionStore.hydrate();
+
             // Fetch user info if access token is available
             if (sessionStore.accessToken) {
                 await sessionStore.fetchUserInfo().then((response) => {
