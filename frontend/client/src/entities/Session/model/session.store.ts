@@ -74,22 +74,42 @@ export const useSessionStore = defineStore({
     },
     setAccessToken(token: string | null) {
       this.accessToken = token
-      const tokenCookie = useCookie(ACCESS_TOKEN_KEY)
+      const tokenCookie = useCookie(ACCESS_TOKEN_KEY, {
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: '/',
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production'
+      })
       tokenCookie.value = token
     },
     setReservations(reservations: string | null) {
       this.reservations = reservations
-      const reservationsCookie = useCookie(RESERVES_KEY)
+      const reservationsCookie = useCookie(RESERVES_KEY, {
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: '/',
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production'
+      })
       reservationsCookie.value = reservations
     },
     setPaymentSession(session: string | null) {
       this.payment_session = session
-      const paymentSessionCookie = useCookie(PAYMENT_SESSION)
+      const paymentSessionCookie = useCookie(PAYMENT_SESSION, {
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: '/',
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production'
+      })
       paymentSessionCookie.value = session
     },
     setUserInfo(userInfo: string | null) {
       this.userInfo = userInfo
-      const userInfoCookie = useCookie(USER_INFO_KEY)
+      const userInfoCookie = useCookie(USER_INFO_KEY, {
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: '/',
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production'
+      })
       userInfoCookie.value = userInfo
     },
     setAuthorized(isAuthorized: boolean) {
@@ -100,12 +120,22 @@ export const useSessionStore = defineStore({
     },
     setUserRole(role: UserRole | null) {
       this.userRole = role
-      const roleCookie = useCookie(USER_ROLE_KEY)
+      const roleCookie = useCookie(USER_ROLE_KEY, {
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: '/',
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production'
+      })
       roleCookie.value = role
     },
     setBrand(slug: string | null) {
       this.brand = slug
-      const brandCookie = useCookie(BRAND_KEY)
+      const brandCookie = useCookie(BRAND_KEY, {
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: '/',
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production'
+      })
       brandCookie.value = slug
     },
     setIsLoading(isLoading: boolean) {

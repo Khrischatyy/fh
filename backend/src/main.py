@@ -117,7 +117,16 @@ app.state.settings = settings
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 # Add session middleware for SQLAdmin authentication
-app.add_middleware(SessionMiddleware, secret_key=settings.admin_secret_key)
+# Use separate cookie name and path to avoid conflicts with JWT auth
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.admin_secret_key,
+    session_cookie="admin_session",  # Different cookie name
+    path="/admin",  # Only apply to /admin routes
+    max_age=3600,  # 1 hour session
+    same_site="lax",
+    https_only=True if settings.app_env == "production" else False
+)
 
 # Setup SQLAdmin
 from src.admin import setup_admin
