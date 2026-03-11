@@ -403,6 +403,9 @@ class DeviceService:
         """
         Unlock a device using local password.
 
+        Checks against current_password (Fernet-encrypted macOS password) first,
+        then falls back to unlock_password_hash (bcrypt) if set.
+
         Args:
             device_uuid: Device UUID
             password: Unlock password
@@ -418,10 +421,25 @@ class DeviceService:
         if not device:
             raise UnauthorizedException("Device not found")
 
-        if not device.unlock_password_hash:
-            raise UnauthorizedException("No unlock password set for this device")
+        password_matched = False
 
-        if not self._verify_password(password, device.unlock_password_hash):
+        # Try current_password (Fernet-encrypted macOS password) first
+        if device.current_password:
+            try:
+                decrypted = self._decrypt_password(device.current_password)
+                if password == decrypted:
+                    password_matched = True
+            except Exception:
+                pass
+
+        # Fall back to unlock_password_hash (bcrypt)
+        if not password_matched and device.unlock_password_hash:
+            if self._verify_password(password, device.unlock_password_hash):
+                password_matched = True
+
+        if not password_matched:
+            if not device.current_password and not device.unlock_password_hash:
+                raise UnauthorizedException("No unlock password set for this device")
             raise UnauthorizedException("Incorrect password")
 
         # Temporarily unblock device (admin can re-block)
