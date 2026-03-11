@@ -185,3 +185,5 @@ class DeviceRegisterWithTokenRequest(BaseModel):
     os_version: Optional[str] = Field(None, max_length=100, description="OS version")
     app_version: Optional[str] = Field(None, max_length=50, description="App version")
     unlock_password: Optional[str] = Field(None, min_length=6, description="Optional unlock password")
+    price_per_hour: Optional[float] = Field(None, ge=0, description="Price per hour for device usage")
+    current_password: Optional[str] = Field(None, min_length=1, max_length=255, description="Current macOS password for device")

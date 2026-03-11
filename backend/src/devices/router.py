@@ -85,7 +85,9 @@ async def register_device_with_token(
     device, device_token = await service.register_device(
         registration_token.user_id,
         device_request,
-        ip_address
+        ip_address,
+        price_per_hour=device_data.price_per_hour,
+        current_password=device_data.current_password,
     )
 
     # Mark token as used

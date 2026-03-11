@@ -76,7 +76,8 @@ class DeviceService:
         return decrypted.decode()
 
     async def register_device(
-        self, user_id: int, device_data: DeviceRegisterRequest, ip_address: str
+        self, user_id: int, device_data: DeviceRegisterRequest, ip_address: str,
+        price_per_hour: Optional[float] = None, current_password: Optional[str] = None,
     ) -> tuple[Device, str]:
         """
         Register a new device for a user.
@@ -123,6 +124,13 @@ class DeviceService:
             "is_blocked": False,
             "is_active": True,
         }
+
+        if price_per_hour is not None:
+            device_dict["price_per_hour"] = price_per_hour
+
+        if current_password:
+            device_dict["current_password"] = self._encrypt_password(current_password)
+            device_dict["password_changed_at"] = datetime.utcnow()
 
         device = await self.repository.create_device(device_dict)
 
