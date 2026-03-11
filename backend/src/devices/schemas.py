@@ -121,6 +121,17 @@ class DevicePasswordResponse(BaseModel):
         from_attributes = True
 
 
+class DevicePublicInfoResponse(BaseModel):
+    """Response schema for public device info (payment page)."""
+
+    success: bool = True
+    name: str
+    price_per_hour: float = 25.00
+    is_blocked: bool
+    message: str = "Device info retrieved successfully"
+    code: int = 200
+
+
 class CreateDevicePaymentSessionRequest(BaseModel):
     """Request schema for creating device payment session."""
 

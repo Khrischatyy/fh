@@ -14,6 +14,7 @@ from src.devices.schemas import (
     DeviceUpdateRequest,
     DeviceHeartbeatRequest,
     DeviceStatusResponse,
+    DevicePublicInfoResponse,
     StorePasswordRequest,
     DevicePasswordResponse,
 )
@@ -568,6 +569,18 @@ class DeviceService:
             device_name=device.name
         )
 
+    async def get_device_public_info(self, device_uuid: str) -> DevicePublicInfoResponse:
+        """Get public device info for payment page."""
+        device = await self.repository.get_device_by_uuid(device_uuid)
+        if not device:
+            raise NotFoundException("Device not found")
+
+        return DevicePublicInfoResponse(
+            name=device.name,
+            price_per_hour=float(device.price_per_hour) if device.price_per_hour else 25.00,
+            is_blocked=device.is_blocked,
+        )
+
     async def create_device_payment_session(
         self,
         device_uuid: str,
@@ -715,7 +728,7 @@ class DeviceService:
         await self.repository.db.flush()
 
         # Get device to fetch password
-        device = await self.repository.get_by_id(unlock_session.device_id)
+        device = await self.repository.get_device_by_id(unlock_session.device_id)
         if not device:
             raise NotFoundException("Device not found")
 
