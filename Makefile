@@ -1,7 +1,7 @@
 .PHONY: help dev prod test clean migrate
 
-# Docker compose command - override with: make DOCKER_COMPOSE=docker-compose <target>
-DOCKER_COMPOSE ?= docker compose
+# Docker compose command - override with: make DOCKER_COMPOSE="docker compose" <target>
+DOCKER_COMPOSE ?= docker-compose
 
 # Colors for output
 GREEN := \033[0;32m

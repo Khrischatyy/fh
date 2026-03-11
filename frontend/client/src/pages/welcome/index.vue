@@ -1,6 +1,6 @@
 <script setup lang="ts">
 
-import {ArtistSection, HeroSection, HomescreenSection, MapSection, StudioSection} from "~/src/pages/welcome/sections";
+import {ArtistSection, HeroSection, HomescreenSection, LockerSection, MapSection, StudioSection} from "~/src/pages/welcome/sections";
 import {useApi} from "~/src/lib/api";
 import {onMounted, ref} from "vue";
 
@@ -19,8 +19,8 @@ const studio = ref<Studio | null>(null)
 const isLoading = ref(true)
 const getMyStudios = async () => {
   const {fetch} = useApi<any>({
-    url: `random-studio`,
-    auth: true
+    url: `address/random-studio`,
+    auth: false
   })
   isLoading.value = true
 
@@ -41,6 +41,7 @@ onMounted(() => {
 <template>
   <div>
     <HeroSection :is-loading="isLoading" :studio="studio"/>
+    <LockerSection />
     <MapSection :is-loading="isLoading" :studio="studio"/>
     <ArtistSection/>
     <StudioSection/>
