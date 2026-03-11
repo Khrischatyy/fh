@@ -292,6 +292,13 @@ prod-restart-api:
 	@docker-compose -f prod.yml restart api
 	@echo "$(GREEN)✅ API restarted!$(NC)"
 
+prod-rebuild-api:
+	@echo "$(YELLOW)Rebuilding and restarting API...$(NC)"
+	@docker-compose -f prod.yml stop api
+	@docker-compose -f prod.yml build api
+	@docker-compose -f prod.yml up -d api
+	@echo "$(GREEN)✅ API rebuilt and restarted!$(NC)"
+
 prod-restart-caddy:
 	@echo "$(YELLOW)Restarting Caddy proxy...$(NC)"
 	@docker-compose -f prod.yml restart caddy
