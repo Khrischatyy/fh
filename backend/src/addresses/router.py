@@ -739,6 +739,79 @@ async def get_map_studios(
     return response_studios
 
 
+@address_router.get(
+    "/random-studio",
+    status_code=status.HTTP_200_OK,
+    summary="Get random studio for welcome page",
+    description="Returns a random complete studio for displaying on the welcome page.",
+)
+async def get_random_studio():
+    """
+    Get a random studio for welcome page display.
+
+    Returns full studio object matching frontend expectations.
+    Only includes complete studios (with operating hours and payment gateway).
+    """
+    import random
+    from src.addresses.repository import AddressRepository
+    from src.addresses.utils import should_show_in_public_search, build_studio_dict
+    from src.database import AsyncSessionLocal, get_redis
+
+    async with AsyncSessionLocal() as session:
+        repository = AddressRepository(session)
+        service = AddressService(repository)
+
+        # Get all public studios
+        all_studios = await service.get_all_studios_for_map()
+
+        # Get Redis for Stripe caching
+        redis_client = None
+        try:
+            async for redis in get_redis():
+                redis_client = redis
+                break
+        except Exception:
+            pass
+
+        # Filter to only complete studios
+        complete_studios = []
+        for studio in all_studios:
+            if await should_show_in_public_search(studio, redis_client):
+                complete_studios.append(studio)
+
+        if not complete_studios:
+            return {
+                "success": False,
+                "data": None,
+                "message": "No studios available",
+                "code": 404
+            }
+
+        # Pick random studio
+        random_studio = random.choice(complete_studios)
+
+        # Build full studio dict with all relationships
+        studio_data = await build_studio_dict(
+            random_studio,
+            include_is_complete=True,
+            include_payment_status=False,
+            redis=redis_client
+        )
+
+        # Ensure latitude/longitude are strings for this endpoint (Laravel compatibility)
+        if studio_data.get("latitude") is not None:
+            studio_data["latitude"] = str(studio_data["latitude"])
+        if studio_data.get("longitude") is not None:
+            studio_data["longitude"] = str(studio_data["longitude"])
+
+        return {
+            "success": True,
+            "data": studio_data,
+            "message": "Random studio retrieved successfully",
+            "code": 200
+        }
+
+
 @address_router.post(
     "/payment-success",
     status_code=status.HTTP_200_OK,

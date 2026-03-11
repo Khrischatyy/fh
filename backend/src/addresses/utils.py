@@ -358,11 +358,17 @@ async def build_studio_dict(
 
     # Add company info
     if address.company:
+        # Transform logo path to proxy URL
+        logo_url = None
+        if address.company.logo:
+            logo_url = _transform_photo_path(address.company.logo)
+
         studio_dict["company"] = {
             "id": address.company.id,
             "name": address.company.name,
             "slug": address.company.slug,
             "logo": address.company.logo,
+            "logo_url": logo_url,  # Frontend expects this field
         }
 
         # Add user_id from admin_company
