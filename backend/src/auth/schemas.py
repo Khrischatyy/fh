@@ -55,7 +55,7 @@ class LoginResponse(BaseModel):
     """Schema for login response - Laravel compatible."""
     message: str
     token: str
-    role: str
+    role: Optional[str] = None
 
 
 class CompanySimpleResponse(BaseModel):

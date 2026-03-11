@@ -208,6 +208,8 @@ class DeviceService:
             # Encrypt password before storing (will be decrypted by locker app)
             update_dict["current_password"] = self._encrypt_password(update_data.current_password)
             update_dict["password_changed_at"] = datetime.now(timezone.utc)
+        if update_data.price_per_hour is not None:
+            update_dict["price_per_hour"] = update_data.price_per_hour
 
         if update_dict:
             device = await self.repository.update_device(device_id, update_dict)
@@ -327,7 +329,7 @@ class DeviceService:
             lockout_info = {
                 "studio_name": company_name,
                 "device_uuid": device.device_uuid,
-                "hourly_rate": 25.00,  # TODO: Get from device/studio settings
+                "hourly_rate": float(device.price_per_hour) if device.price_per_hour else 25.00,
                 "booking_url": f"{settings.frontend_url}/device-payment?device_uuid={device.device_uuid}&device_name={device.name}",
                 "currency": "USD"
             }
@@ -377,7 +379,7 @@ class DeviceService:
             lockout_info = {
                 "studio_name": company_name,
                 "device_uuid": device.device_uuid,
-                "hourly_rate": 25.00,  # TODO: Get from device/studio settings
+                "hourly_rate": float(device.price_per_hour) if device.price_per_hour else 25.00,
                 "booking_url": f"{settings.frontend_url}/device-payment?device_uuid={device.device_uuid}&device_name={device.name}",
                 "currency": "USD"
             }
@@ -575,9 +577,8 @@ class DeviceService:
         if not studio_owner or not studio_owner.stripe_account_id:
             raise NotFoundException("Studio owner not found or Stripe account not configured")
 
-        # Calculate amount (hourly rate from studio owner settings or default)
-        hourly_rate = 25.00  # Default hourly rate in USD
-        # TODO: Get hourly rate from studio/device settings
+        # Calculate amount (hourly rate from device settings or default)
+        hourly_rate = float(device.price_per_hour) if device.price_per_hour else 25.00
         total_amount = hourly_rate * unlock_duration_hours
         amount_cents = int(total_amount * 100)
 

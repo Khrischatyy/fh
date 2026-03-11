@@ -23,6 +23,7 @@ class DeviceUpdateRequest(BaseModel):
     notes: Optional[str] = None
     unlock_password: Optional[str] = Field(None, min_length=6)
     current_password: Optional[str] = Field(None, min_length=6, max_length=255, description="Current macOS password for device")
+    price_per_hour: Optional[float] = Field(None, ge=0, description="Price per hour for device unlock")
     is_active: Optional[bool] = None
 
 
@@ -60,6 +61,7 @@ class DeviceResponse(BaseModel):
     notes: Optional[str]
     current_password: Optional[str]
     password_changed_at: Optional[datetime_type]
+    price_per_hour: Optional[float] = 25.00
     created_at: datetime_type
 
     class Config:

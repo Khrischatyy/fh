@@ -42,6 +42,9 @@ class Device(Base, IDMixin, TimestampMixin):
     current_password: Mapped[str | None] = mapped_column(String(500), nullable=True)
     password_changed_at: Mapped[datetime_type | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Pricing
+    price_per_hour: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True, server_default="25.00")
+
     # Notes
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 

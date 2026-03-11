@@ -21,6 +21,7 @@ interface Device {
   notes: string | null
   current_password: string | null
   password_changed_at: string | null
+  price_per_hour: number | null
   created_at: string
 }
 
@@ -40,6 +41,7 @@ const isSaving = ref(false)
 const formData = ref({
   name: '',
   current_password: '',
+  price_per_hour: 25,
 })
 
 const showPassword = ref(false)
@@ -90,6 +92,7 @@ const handleSave = async () => {
     const dataToSend = {
       name: formData.value.name,
       current_password: formData.value.current_password || null,
+      price_per_hour: formData.value.price_per_hour,
     }
 
     const response = await updateDevice(dataToSend)
@@ -169,6 +172,7 @@ watch(() => props.device, (newDevice) => {
     formData.value = {
       name: newDevice.name || '',
       current_password: newDevice.current_password || '',
+      price_per_hour: newDevice.price_per_hour ?? 25,
     }
   }
 }, { immediate: true })
@@ -228,15 +232,73 @@ watch(() => props.device, (newDevice) => {
         </div>
       </div>
 
-      <!-- Device Name -->
-      <div class="mb-5">
-        <label class="text-[11px] text-white/30 uppercase tracking-wider block mb-1.5">Device Name</label>
-        <input
-          type="text"
-          v-model="formData.name"
-          placeholder="Enter device name"
-          class="w-full px-3 h-11 outline-none rounded-[10px] border border-dashed border-white/[0.12] hover:border-white/[0.2] focus:border-white/40 bg-transparent text-white text-sm font-medium tracking-wide"
-        />
+      <!-- Editable Fields -->
+      <div class="mb-5 space-y-3">
+        <div>
+          <label class="text-[11px] text-white/30 uppercase tracking-wider block mb-1.5">Device Name</label>
+          <input
+            type="text"
+            v-model="formData.name"
+            placeholder="Enter device name"
+            class="w-full px-3 h-11 outline-none rounded-[10px] border border-dashed border-white/[0.12] hover:border-white/[0.2] focus:border-white/40 bg-transparent text-white text-sm font-medium tracking-wide"
+          />
+        </div>
+        <div>
+          <label class="text-[11px] text-white/30 uppercase tracking-wider block mb-1.5">Price per Hour ($)</label>
+          <input
+            type="number"
+            v-model.number="formData.price_per_hour"
+            placeholder="25.00"
+            min="0"
+            step="0.01"
+            class="w-full px-3 h-11 outline-none rounded-[10px] border border-dashed border-white/[0.12] hover:border-white/[0.2] focus:border-white/40 bg-transparent text-white text-sm font-medium tracking-wide"
+          />
+        </div>
+        <div>
+          <label class="text-[11px] text-white/30 uppercase tracking-wider block mb-1.5">Device Password</label>
+          <div class="flex gap-2">
+            <div class="relative flex-1">
+              <input
+                :type="showPassword ? 'text' : 'password'"
+                v-model="formData.current_password"
+                placeholder="Enter password"
+                class="w-full px-3 pr-10 h-11 outline-none rounded-[10px] border border-dashed border-white/[0.12] hover:border-white/[0.2] focus:border-white/40 bg-transparent text-white text-sm font-medium tracking-wide"
+              />
+              <button
+                @click="showPassword = !showPassword"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+              >
+                <svg v-if="showPassword" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                </svg>
+                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </button>
+            </div>
+            <button
+              @click="generatePassword"
+              class="h-11 px-3 rounded-[10px] border border-dashed border-white/[0.12] hover:border-white/[0.25] hover:bg-white/[0.06] text-white/50 text-xs transition-colors"
+              title="Generate"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <button
+              @click="copyPassword"
+              class="h-11 px-3 rounded-[10px] border border-dashed transition-colors"
+              :class="passwordCopied ? 'border-green-500/30 text-green-400' : 'border-white/[0.12] hover:border-white/[0.25] hover:bg-white/[0.06] text-white/50'"
+              title="Copy"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path v-if="passwordCopied" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Actions -->
